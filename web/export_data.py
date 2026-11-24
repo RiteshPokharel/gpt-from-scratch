@@ -169,6 +169,12 @@ models = {
         "loss": ts_loss,
     },
 }
+# size of the 8-bit browser files (written by export_browser_model.py), in MB
+models["sizes"] = {}
+for name in ("shakespeare", "tinystories"):
+    mf = os.path.join("web", "models", f"{name}.json")
+    if os.path.exists(mf):
+        models["sizes"][name] = round(json.load(open(mf))["bytes"] / 1e6, 1)
 dump("models.json", models)
 
 # ---------------------------------------------------------------- samples through training

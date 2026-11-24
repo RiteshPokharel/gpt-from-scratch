@@ -5,3 +5,4 @@ __pycache__/
 out/train.log
 data/tinystories/
 out/*.log
+out/release/

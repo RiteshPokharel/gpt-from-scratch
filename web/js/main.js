@@ -528,7 +528,22 @@ function compare(m, merges) {
        <div class="b2" data-model="tinystories"><span class="b2-fill${b.done ? "" : " partial"}" style="width:100%"><span class="done" style="width:${(b.elapsed_h / bpeH) * 100}%"></span></span><span class="b2-val">≈ ${fmt(bpeH, 1)} hours${b.done ? "" : `, ${fmt(b.elapsed_h, 1)} so far`}</span></div>
      </div>`);
 
-  $("#cmp").innerHTML = r1 + r2 + r3 + r4 + r5;
+  // 6. shrinking the models so they can run on a visitor's computer
+  const full = { shakespeare: (c.params * 4) / 1e6, tinystories: (b.params * 4) / 1e6 };
+  const small = { shakespeare: m.sizes?.shakespeare ?? 10.9, tinystories: m.sizes?.tinystories ?? 27.7 };
+  const shrink = (model, name) => `
+    <div class="shrink" data-model="${model}">
+      <span class="scale-label">${name}</span>
+      <div class="shrink-bars">
+        <div class="b2"><span class="b2-fill partial" style="width:100%"></span><span class="b2-val">${fmt(full[model], 0)} MB after training</span></div>
+        <div class="b2"><span class="b2-fill" style="width:${(small[model] / full[model]) * 100}%"></span><span class="b2-val">${fmt(small[model], 1)} MB in your browser</span></div>
+      </div>
+    </div>`;
+  const r6 = row("How they run in your browser",
+    `After training, the TinyStories model is ${fmt(full.tinystories, 0)} MB. That's too big to ask anyone to download. So every number in it is stored with less detail, 8 bits instead of 32. That shrinks it to ${fmt(small.tinystories, 1)} MB (Shakespeare: ${fmt(small.shakespeare, 1)} MB), and the writing comes out the same. A small JavaScript program then runs it right here in your browser. Tested against the original, it picked the same next word in every test.`,
+    shrink("tinystories", "TinyStories") + shrink("shakespeare", "Shakespeare"));
+
+  $("#cmp").innerHTML = r1 + r2 + r3 + r4 + r5 + r6;
 }
 
 
