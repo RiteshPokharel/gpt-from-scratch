@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>gpt-from-scratch</title>
+<meta name="description" content="Two small GPT language models written from scratch in PyTorch and trained on a laptop. Try them, and see what happens inside when they write.">
+<meta name="theme-color" content="#050a07">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&family=STIX+Two+Text:ital@0;1&family=VT323&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<a class="skip" href="#try">Skip to the demo</a>
+<nav class="tmux" aria-label="Sections">
+  <span class="tmux-session">[gpt]</span>
+  <ol class="tmux-windows">
+    <li><a href="#try">Try it</a></li>
+    <li><a href="#models">The models</a></li>
+    <li><a href="#how">How it works</a></li>
+    <li><a href="#learn">How it learned</a></li>
+  </ol>
+</nav>
+
+<main class="screen">
+
+  <header class="boot">
+    <p class="boot-log" aria-hidden="true">
+      <span>[ ok ] apple m5 gpu</span>
+      <span>[ ok ] 2 models loaded</span>
+    </p>
+    <h1 class="title">gpt-from-scratch</h1>
+    <p class="lede">Two GPT language models built from scratch in PyTorch, following the transformer from the 2017 paper <a href="https://arxiv.org/abs/1706.03762" target="_blank" rel="noopener">Attention Is All You Need</a>, and trained on a laptop. One learned Shakespeare, the other children's stories. Pick one, give it a starting line, and watch it write.</p>
+  </header>
+
+  <!-- ============================================================ try -->
+  <section id="try" class="block" aria-labelledby="try-h">
+    <h2 id="try-h" class="sr">Try it</h2>
+    <div class="console">
+      <div class="console-top">
+        <div class="seg" role="radiogroup" aria-label="Model">
+          <button type="button" role="radio" data-model="tinystories" aria-checked="true"><span class="swatch"></span>TinyStories</button>
+          <button type="button" role="radio" data-model="shakespeare" aria-checked="false"><span class="swatch"></span>Shakespeare</button>
+        </div>
+        <p class="mode" id="mode" aria-live="polite"></p>
+      </div>
+      <form class="ask" id="ask">
+        <label class="sr" for="prompt">Starting line</label>
+        <span class="ps1" aria-hidden="true">&gt;</span>
+        <input id="prompt" name="prompt" type="text" autocomplete="off" spellcheck="false" maxlength="200" value="Once upon a time">
+        <button class="go" id="go" type="submit">Generate</button>
+      </form>
+      <p class="notice" id="notice" hidden></p>
+      <div class="examples">
+        <span class="flag">Examples</span>
+        <div class="chips" id="examples"></div>
+      </div>
+      <pre class="out" id="out" aria-live="off"></pre>
+      <div class="console-foot">
+        <span id="count"></span>
+      </div>
+      <div class="loadbar" id="loadbar" hidden><span id="loadfill"></span></div>
+    </div>
+  </section>
+
+  <!-- ============================================================ models -->
+  <section id="models" class="block" aria-labelledby="models-h">
+    <div class="sec-head">
+      <h2 id="models-h">The two models</h2>
+      <p class="intro">Both use the same design underneath, the transformer from the paper above, and were trained the same way. What differs is what they read, how they cut it into pieces, and how big they are.</p>
+    </div>
+    <p class="key"><span data-model="shakespeare"><span class="swatch"></span>Shakespeare</span><span data-model="tinystories"><span class="swatch"></span>TinyStories</span></p>
+    <div class="cmp" id="cmp"></div>
+  </section>
+
+  <!-- ============================================================ how -->
+  <section id="how" class="block" aria-labelledby="how-h" data-active="tinystories">
+    <div class="sec-head">
+      <h2 id="how-h">What happens when you press Generate</h2>
+      <div class="seg-row">
+        <span class="flag" id="how-seg-label">Show the example for:</span>
+        <div class="seg" id="how-seg" role="radiogroup" aria-labelledby="how-seg-label">
+          <button type="button" role="radio" data-model="tinystories" aria-checked="true"><span class="swatch"></span>TinyStories</button>
+          <button type="button" role="radio" data-model="shakespeare" aria-checked="false"><span class="swatch"></span>Shakespeare</button>
+        </div>
+      </div>
+      <p class="intro" id="how-intro">The model writes one small piece at a time. Here is how it picked the first piece after your starting line.</p>
+    </div>
+    <ol class="steps">
+      <li class="step">
+        <div class="step-text">
+          <h3>Your text is cut into tokens</h3>
+          <p id="s1-text">The model can't read letters directly. It cuts the text into pieces called tokens, and each token has an ID number.</p>
+        </div>
+        <div class="step-vis tokens" id="s1"></div>
+      </li>
+      <li class="step">
+        <div class="step-text">
+          <h3>Each token becomes a list of numbers</h3>
+          <p id="s2-text">Every token ID is swapped for a list of numbers the model learned during training. Similar tokens end up with similar numbers.</p>
+        </div>
+        <div class="step-vis" id="s2"></div>
+      </li>
+      <li class="step">
+        <div class="step-text">
+          <h3>It looks back at the earlier tokens</h3>
+          <p id="s3-text">This is called attention. To choose what comes next, the last token looks back at the ones before it. Each row is one layer of the model. Brighter means it looked there more.</p>
+        </div>
+        <div class="step-vis" id="s3"></div>
+        <details class="math" id="m3">
+          <summary>
+            <span class="m-sign" aria-hidden="true"></span>
+            <span class="m-title"><span class="m-open">Show the math</span><span class="m-close">Hide the math</span></span>
+            <span class="m-sub">the attention equation, symbol by symbol</span>
+          </summary>
+          <div class="math-body">
+            <p class="math-src">Equation (1) from <a href="https://arxiv.org/abs/1706.03762" target="_blank" rel="noopener">Attention Is All You Need</a></p>
+            <div class="eq" role="math" aria-label="Attention of Q, K, V equals softmax of Q times K transposed, divided by the square root of d k, times V">
+              <span class="fn">Attention</span>(<var class="q">Q</var>, <var class="k">K</var>, <var class="v">V</var>) = <span class="fn">softmax</span><span class="paren">(</span><span class="frac"><span><var class="q">Q</var><var class="k">K</var><sup>T</sup></span><span>√<var class="d">d</var><sub class="d">k</sub></span></span><span class="paren">)</span> <var class="v">V</var>
+            </div>
+            <div class="syms">
+              <div class="symc"><span class="sym-k"><var class="q">Q</var></span><b>query</b><p>What the current token is looking for.</p></div>
+              <div class="symc"><span class="sym-k"><var class="k">K</var></span><b>key</b><p>What each earlier token has to offer.</p></div>
+              <div class="symc"><span class="sym-k"><var class="q">Q</var><var class="k">K</var><sup>T</sup></span><b>match scores</b><p>Query times every key: one score per earlier token, how well they match.</p></div>
+              <div class="symc"><span class="sym-k">√<var class="d">d</var><sub class="d">k</sub></span><b>scale</b><p id="m3-dk"></p></div>
+              <div class="symc"><span class="sym-k"><span class="fn">softmax</span></span><b>to percentages</b><p>Scores become percentages that add up to 100%. Later tokens are masked to 0%, so it can't peek ahead.</p></div>
+              <div class="symc"><span class="sym-k"><var class="v">V</var></span><b>value</b><p>The information each token passes on, mixed by those percentages.</p></div>
+            </div>
+            <p class="math-note" id="m3-heads"></p>
+          </div>
+        </details>
+      </li>
+      <li class="step">
+        <div class="step-text">
+          <h3>It scores every possible next token</h3>
+          <p id="s4-text">The model gives each token in its vocabulary a probability of coming next. These are its ten favourites.</p>
+        </div>
+        <div class="step-vis" id="s4"></div>
+        <details class="math" id="m4">
+          <summary>
+            <span class="m-sign" aria-hidden="true"></span>
+            <span class="m-title"><span class="m-open">Show the math</span><span class="m-close">Hide the math</span></span>
+            <span class="m-sub">softmax, with this run's real numbers</span>
+          </summary>
+          <div class="math-body">
+            <p class="math-src">Softmax: from raw scores to chances</p>
+            <div class="eq" role="math" aria-label="p i equals e to the z i, divided by the sum over j of e to the z j">
+              <var>p</var><sub>i</sub> = <span class="frac"><span>e<sup><var>z</var><sub>i</sub></sup></span><span><span class="big">Σ</span><sub>j</sub> e<sup><var>z</var><sub>j</sub></sup></span></span>
+            </div>
+            <div class="syms">
+              <div class="symc"><span class="sym-k"><var>z</var><sub>i</sub></span><b>raw score</b><p>The model's score for token <var>i</var> (a logit). Any number, even negative.</p></div>
+              <div class="symc"><span class="sym-k">e<sup><var>z</var></sup></span><b>exponent</b><p>Makes every score positive, and big scores much bigger.</p></div>
+              <div class="symc"><span class="sym-k"><span class="big">Σ</span></span><b>total</b><p id="m4-sigma"></p></div>
+            </div>
+            <div class="scroll-x"><table class="sm-tab" id="m4-tab"></table></div>
+            <p class="math-note" id="m4-note"></p>
+          </div>
+        </details>
+      </li>
+      <li class="step">
+        <div class="step-text">
+          <h3>It picks one, adds it, and repeats</h3>
+          <p id="s5-text">It picks a token at random, weighted by those probabilities, so the likely ones win most of the time but not always. Then it adds the token to the text and goes back to step 1.</p>
+        </div>
+        <div class="step-vis loop" id="s5"></div>
+      </li>
+    </ol>
+  </section>
+
+  <!-- ============================================================ learn -->
+  <section id="learn" class="block" aria-labelledby="learn-h">
+    <div class="sec-head">
+      <h2 id="learn-h">How it learned</h2>
+      <p class="intro">Training means showing the model real text, letting it guess the next token, and nudging its numbers whenever it guesses wrong. "Loss" measures how wrong it is, so lower is better.</p>
+    </div>
+    <div class="replay">
+      <div class="replay-ctl">
+        <label class="field-label" for="replay-slider">TinyStories, training step</label>
+        <input type="range" id="replay-slider" min="0" max="0" step="1" value="0">
+        <div class="readout"><span class="big" id="replay-step">0</span><span class="unit">step</span><span class="big" id="replay-val">0.00</span><span class="unit">loss</span></div>
+      </div>
+      <pre class="out replay-out" id="replay-out"></pre>
+      <p class="note">Drag the slider: the story it wrote every 500 steps while training, starting from random noise.</p>
+    </div>
+    <div class="charts">
+      <figure class="chart" data-model="shakespeare" id="chart-char">
+        <figcaption><span class="pane-name"><span class="swatch"></span>Shakespeare</span> <span class="dim">loss per letter</span></figcaption>
+        <div class="plot"></div>
+        <p class="chart-note">After step 2,000 it began memorising its training text (that line kept falling while the unseen-text line rose), so the step 2,000 version is the one kept.</p>
+      </figure>
+      <figure class="chart" data-model="tinystories" id="chart-bpe">
+        <figcaption><span class="pane-name"><span class="swatch"></span>TinyStories</span> <span class="dim">loss per token</span></figcaption>
+        <div class="plot"></div>
+        <p class="chart-note" id="bpe-chart-note"></p>
+      </figure>
+    </div>
+  </section>
+
+  <footer class="block end">
+    <p>Built by Ritesh Pokharel. Written in PyTorch and trained on an Apple M5 laptop GPU, with no pretrained weights and no tokenizer libraries. In live mode the model runs in your browser, in plain JavaScript.</p>
+    <div class="refs">
+      <h2>References</h2>
+      <ol>
+        <li>Vaswani et al., <a href="https://arxiv.org/abs/1706.03762" target="_blank" rel="noopener">Attention Is All You Need</a>, 2017. The transformer design both models use.</li>
+        <li>Eldan and Li, <a href="https://arxiv.org/abs/2305.07759" target="_blank" rel="noopener">TinyStories: How Small Can Language Models Be and Still Speak Coherent English?</a>, 2023. The children's stories dataset.</li>
+        <li>Karpathy, <a href="https://github.com/karpathy/char-rnn/tree/master/data/tinyshakespeare" target="_blank" rel="noopener">TinyShakespeare</a>, from char-rnn, 2015. The Shakespeare text file.</li>
+      </ol>
+    </div>
+    <p class="dim" id="updated"></p>
+  </footer>
+</main>
+
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
