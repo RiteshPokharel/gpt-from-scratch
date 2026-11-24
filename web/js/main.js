@@ -475,17 +475,18 @@ function compare(m, merges) {
       <div class="cmp-text"><h3>${title}</h3><p>${text}</p></div>
       <div class="cmp-vis">${vis}</div>
     </div>`;
-  const file = (model, name, text) => `<figure class="file" data-model="${model}"><figcaption><span class="swatch"></span>${esc(name)}</figcaption><pre>${esc(text)}</pre></figure>`;
+  const file = (model, label, text) => `<figure class="file" data-model="${model}"><figcaption><span class="swatch"></span>${esc(label)}</figcaption><pre>${esc(text)}</pre></figure>`;
 
   // 1. data: excerpts + scale (one square = all of Shakespeare)
   const ratio = Math.round(b.dataset_chars / c.dataset_chars);
   const squares = `<div class="scale" role="img" aria-label="One square for Shakespeare's text, ${fmt(ratio)} squares for the stories">
-      <div class="scale-row" data-model="shakespeare"><span class="scale-label">Shakespeare</span><span class="dots"><i></i></span></div>
-      <div class="scale-row" data-model="tinystories"><span class="scale-label">TinyStories</span><span class="dots">${"<i></i>".repeat(ratio)}</span></div>
+      <p class="scale-key">How much text each one read: <i class="key-dot"></i> 1 square = all of Shakespeare (${fmt(c.dataset_chars / 1e6, 1)} million characters)</p>
+      <div class="scale-row" data-model="shakespeare"><span class="scale-label">Shakespeare</span><span class="dots"><i></i></span><span class="scale-n">1 square</span></div>
+      <div class="scale-row" data-model="tinystories"><span class="scale-label">TinyStories</span><span class="dots">${"<i></i>".repeat(ratio)}</span><span class="scale-n">${fmt(ratio)} squares</span></div>
     </div>`;
   const r1 = row("What they learned from",
-    `Shakespeare's plays (${fmt(c.dataset_lines)} lines) and ${fmt(b.stories / 1e6, 1)} million children's stories written with words a 3 or 4 year old knows. Each square below is the whole Shakespeare file, ${fmt(c.dataset_chars / 1e6, 1)} million characters. The stories fill ${fmt(ratio)} of them.`,
-    `<div class="files">${file("shakespeare", c.file, c.excerpt)}${file("tinystories", b.file, b.excerpt)}</div>${squares}`);
+    `The Shakespeare model read Shakespeare's plays (${fmt(c.dataset_lines)} lines). The TinyStories model read ${fmt(b.stories / 1e6, 1)} million short children's stories, written with words a 3 or 4 year old knows. The two boxes show a real piece of each. Below, you can see how much more text the stories are.`,
+    `<div class="files">${file("shakespeare", "A real piece of what the Shakespeare model read", c.excerpt)}${file("tinystories", "A real piece of what the TinyStories model read", b.excerpt)}</div>${squares}`);
 
   // 2. the same sentence, cut both ways
   const sentence = "Once upon a time, there was a little dog named Max.";

@@ -392,14 +392,17 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 
 .files { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
 .file { margin: 0; border: 1px solid var(--rule); border-top: 2px solid var(--m); background: var(--panel); min-width: 0; }
-.file figcaption { padding: .4rem .7rem; border-bottom: 1px solid var(--rule); font-size: 11px; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file figcaption { padding: .45rem .7rem; border-bottom: 1px solid var(--rule); font-size: var(--fs-0); color: var(--bright); }
 .file pre {
   margin: 0; padding: .7rem; height: 8rem; overflow: hidden;
   font: 400 12px/1.55 var(--mono); color: var(--ink); white-space: pre-wrap;
   -webkit-mask-image: linear-gradient(to bottom, #000 55%, transparent); mask-image: linear-gradient(to bottom, #000 55%, transparent);
 }
 .scale { display: grid; gap: .5rem; }
-.scale-row { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); gap: .8rem; align-items: start; }
+.scale-row { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr) auto; gap: .8rem; align-items: start; }
+.scale-key { margin: 0 0 .2rem; font-size: var(--fs-0); color: var(--ink); }
+.key-dot { display: inline-block; width: 6px; height: 6px; background: var(--ink); vertical-align: middle; margin: 0 .2rem; }
+.scale-n { font-size: var(--fs-0); color: var(--dim); white-space: nowrap; }
 .scale-label { font-size: var(--fs-0); color: var(--dim); }
 .dots { display: flex; flex-wrap: wrap; gap: 1px; }
 .dots i { width: 5px; height: 5px; background: var(--m); opacity: .85; }
