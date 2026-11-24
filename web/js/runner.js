@@ -73,7 +73,7 @@ export function makeRunner(manifest, buffer, merges) {
     };
   }
 
-  // Continue after analyse(); calls onPiece(text | null for end-of-story, id) for each token.
+  // Continue after analyse(); calls onPiece(text | null for end-of-story, id) for each token; stops after an end-of-story.
   function generate(analysis, n, onPiece, rand = Math.random) {
     const history = analysis.ids.slice();
     let logits = analysis.logits;
@@ -81,7 +81,7 @@ export function makeRunner(manifest, buffer, merges) {
     for (let i = 0; i < n; i++) {
       const id = sample(logits, settings.temperature, settings.topK, rand);
       history.push(id);
-      if (id === eot) { onPiece(null, id); pending = []; }
+      if (id === eot) { onPiece(null, id); break; } // the story is finished: stop, don't start a new one
       else if (isChar) onPiece(chars[id], id);
       else {
         pending.push(...bpe.bytes(id));

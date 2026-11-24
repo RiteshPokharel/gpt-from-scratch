@@ -26,10 +26,14 @@ Promise.all([
   const showExample = (model) => {
     howSeg.forEach((b) => b.setAttribute("aria-checked", b.dataset.model === model));
     $("#how").dataset.active = model;
+    moveThumb($("#how-seg"));
+    const steps = $(".steps");
+    steps.classList.remove("switching"); void steps.offsetWidth; steps.classList.add("switching");
     explain(recordings.explainer[model].analysis, recordings.explainer[model].prompt, model);
   };
   howSeg.forEach((b) => b.addEventListener("click", () => showExample(b.dataset.model)));
   showExample("tinystories");
+  stepper();
   charts(models);
   replayer(replay);
   compare(models, merges);
@@ -41,36 +45,48 @@ Promise.all([
 
 /* ================================================================ the demo */
 function demo(recordings, manifests) {
-  const state = { model: "tinystories", workers: {}, ready: {}, timer: null, last: null, variant: {}, speed: {}, runId: 0, loading: null };
-  document.body.dataset.active = state.model;
+  // no model is selected until the visitor picks one
+  const state = { model: null, workers: {}, ready: {}, timer: null, last: null, variant: {}, speed: {}, runId: 0, loading: null, typed: false };
+  const DEFAULT_LINE = { tinystories: "Once upon a time", shakespeare: "ROMEO:" };
   const input = $("#prompt"), go = $("#go"), out = $("#out"), notice = $("#notice");
 
-  // model switch
-  const seg = [...document.querySelectorAll(".seg [role=radio]")];
-  seg.forEach((b) => b.addEventListener("click", () => {
-    if (b.dataset.model === state.model) return;
-    state.model = b.dataset.model;
-    seg.forEach((x) => x.setAttribute("aria-checked", x === b));
-    $(".console").dataset.active = state.model;
-    document.body.dataset.active = state.model;
+  // choosing a model: the label switches from "Choose your model:" to "You chose:"
+  const seg = [...document.querySelectorAll("#try .seg [role=radio]")];
+  function selectModel(name) {
+    if (name === state.model) return;
+    state.model = name;
+    seg.forEach((x) => x.setAttribute("aria-checked", x.dataset.model === name));
+    $(".console").dataset.active = name;
+    document.body.dataset.active = name;
+    moveThumb($("#try .seg"));
+    if ($(".console").classList.contains("unpicked")) {
+      const label = $("#pick-label");
+      label.textContent = "You chose:";
+      label.classList.add("swap");
+      $(".console").classList.remove("unpicked");
+      $(".console").classList.add("revealed");
+      $("#console-body").inert = false;
+    }
+    if (!state.typed || !input.value.trim()) input.value = DEFAULT_LINE[name];
     run(input.value);
-  }));
-  $(".console").dataset.active = state.model;
+  }
+  seg.forEach((b) => b.addEventListener("click", () => selectModel(b.dataset.model)));
 
   // examples
   recordings.prompts.forEach((p) => {
     const b = document.createElement("button");
     b.type = "button"; b.className = "chip"; b.textContent = p.replace(/\n/g, "↵");
-    b.addEventListener("click", () => { input.value = p; run(p); });
+    b.addEventListener("click", () => { input.value = p; state.typed = true; run(p); });
     $("#examples").append(b);
   });
 
   $("#ask").addEventListener("submit", (e) => { e.preventDefault(); run(input.value); });
-  input.addEventListener("input", labels);
+  input.addEventListener("input", () => { state.typed = true; labels(); });
 
   const recorded = (prompt) => recordings.models[state.model].runs[prompt];
 
   function labels() {
+    if (!state.model) return;
     const live = state.ready[state.model];
     const size = mb(manifests[state.model].bytes);
     const again = state.last === `${state.model}|${input.value}`;
@@ -142,7 +158,7 @@ function demo(recordings, manifests) {
   // ---------------------------------------------------------------- run
   // Every run gets an id; starting a new run (or switching model) makes the old one stop.
   async function run(prompt) {
-    if (state.loading) return;
+    if (!state.model || state.loading) return;
     if (!prompt.trim()) { input.focus(); return; }
     const id = ++state.runId;
     clearInterval(state.timer);
@@ -188,10 +204,35 @@ function demo(recordings, manifests) {
   }
 
   labels();
-  run(input.value);
 }
 
 /* ================================================================ the five steps */
+// "How it works" opens on step 1; the visitor reveals the rest one step at a time.
+function stepper() {
+  const steps = [...document.querySelectorAll(".steps .step")];
+  const next = $("#next-step"), all = $("#all-steps");
+  let shown = 1;
+  const render = (focusNew) => {
+    steps.forEach((li, i) => { li.hidden = i >= shown; });
+    const done = shown >= steps.length;
+    next.textContent = done ? "Start over" : `Next: ${steps[shown].querySelector("h3").textContent}`;
+    next.classList.toggle("restart", done);
+    all.hidden = done;
+    $("#step-count").textContent = `step ${shown} of ${steps.length}`;
+    if (focusNew) {
+      const li = steps[shown - 1];
+      li.classList.remove("fresh"); void li.offsetWidth; li.classList.add("fresh");
+      li.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+    }
+  };
+  next.addEventListener("click", () => {
+    if (shown >= steps.length) { shown = 1; render(false); $("#how").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth" }); return; }
+    shown++; render(true);
+  });
+  all.addEventListener("click", () => { shown = steps.length; render(false); });
+  render(false);
+}
+
 // One fixed example per model (recorded by record_demo.mjs), the same for every visitor.
 function explain(a, prompt, model) {
   const isChar = model === "shakespeare";
@@ -376,6 +417,28 @@ function compare(m, merges) {
 function statusBar(m) {
   $("#updated").textContent = `Numbers last updated ${m.updated}.`;
 }
+
+// The coloured thumb behind a model switch: slides to the chosen button and takes its colour.
+function moveThumb(seg, flash = true) {
+  let thumb = seg.querySelector(".seg-thumb");
+  if (!thumb) {
+    thumb = document.createElement("span");
+    thumb.className = "seg-thumb";
+    seg.prepend(thumb);
+  }
+  const on = seg.querySelector('[aria-checked="true"]');
+  if (!on) return;
+  const first = !thumb.classList.contains("on");
+  if (first) thumb.style.transition = "none"; // appear in place, then slide from there on
+  thumb.dataset.model = on.dataset.model;
+  thumb.style.width = `${on.offsetWidth}px`;
+  thumb.style.transform = `translateX(${on.offsetLeft}px)`;
+  thumb.classList.add("on");
+  if (first) { void thumb.offsetWidth; thumb.style.transition = ""; }
+  if (flash && !first) { thumb.classList.remove("flash"); void thumb.offsetWidth; thumb.classList.add("flash"); } // lights up as it lands
+}
+addEventListener("resize", () => document.querySelectorAll(".seg").forEach((g) => moveThumb(g, false)));
+document.fonts?.ready.then(() => document.querySelectorAll(".seg").forEach((g) => moveThumb(g, false))); // widths change once the fonts load
 
 // Arrow keys move between the buttons of a model switch, like a radio group.
 document.addEventListener("keydown", (e) => {

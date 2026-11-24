@@ -18,7 +18,7 @@ export const PROMPTS = [
   "Lily wanted to",
   "O Romeo, Romeo",
 ];
-const LENGTH = { shakespeare: 320, tinystories: 160 };
+const LENGTH = { shakespeare: 320, tinystories: 320 }; // TinyStories stops earlier, at the end of its story
 const VARIANTS = 3; // different stories per example, so "Write another" gives a new one
 
 const dir = new URL("./", import.meta.url);
@@ -54,7 +54,10 @@ if (process.argv.includes("--explainer")) {
   process.exit(0);
 }
 
-for (const name of ["shakespeare", "tinystories"]) {
+// node web/record_demo.mjs tinystories   re-records one model and keeps the other's examples
+const only = ["shakespeare", "tinystories"].filter((m) => process.argv.includes(m));
+if (only.length) Object.assign(out, JSON.parse(read("data/recordings.json")));
+for (const name of only.length ? only : ["shakespeare", "tinystories"]) {
   const manifest = JSON.parse(read(`models/${name}.json`));
   const runner = loadRunner(name);
   const runs = {};

@@ -113,27 +113,56 @@ body[data-active="shakespeare"] #try, #how[data-active="shakespeare"] { --accent
 
 /* ------------------------------------------------------------------ the console */
 .console {
-  transition: border-color .3s;
+  transition: border-color .35s;
   background: var(--panel);
   border: 1px solid var(--rule);
   border-top: 2px solid var(--accent);
   display: grid;
 }
-.console > * { padding-inline: 1.1rem; }
+.console > .console-top, .console-inner > * { padding-inline: 1.1rem; }
+/* after the first choice: a scanline sweeps down and the demo is drawn in behind it */
+.console.unpicked .console-body { display: none; }
+.console-body { position: relative; }
+.console-inner { position: relative; }
+.console.revealed .console-inner { animation: wipe .6s cubic-bezier(.4, 0, .2, 1) both; }
+.console.revealed .console-body::after {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px; pointer-events: none;
+  background: var(--accent); box-shadow: 0 0 10px 2px rgba(var(--accent-rgb), .75), 0 0 30px 6px rgba(var(--accent-rgb), .25);
+  animation: scan .6s cubic-bezier(.4, 0, .2, 1) both;
+}
+@keyframes wipe { from { clip-path: inset(0 0 100% 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes scan { from { top: 0; opacity: 1; } 85% { opacity: 1; } to { top: 100%; opacity: 0; } }
+.pick-label.swap { animation: swap .3s ease-out; }
+@keyframes swap { 0% { opacity: 0; transform: translateY(-4px); } 100% { opacity: 1; } }
+.steps.switching { animation: fadein .3s ease; }
+@keyframes fadein { from { opacity: .25; } }
+/* before a model is chosen, only the choice is shown */
+.console.unpicked { border-top-color: var(--rule-hi); }
+.console.unpicked .console-top { padding-block: 1.5rem; }
+.console.unpicked .mode { display: none; }
+.pick-label { font-size: var(--fs-1); font-weight: 600; color: var(--bright); }
 .console-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem 1.5rem; padding-block: 1rem .25rem; }
-.seg { display: inline-flex; gap: .4rem; }
+/* model switch: a coloured thumb slides behind the chosen button */
+.seg { display: inline-flex; gap: .4rem; position: relative; isolation: isolate; }
+.seg-thumb {
+  position: absolute; z-index: -1; top: 0; left: 0; height: 100%; width: 0;
+  background: var(--m, var(--phos)); opacity: 0;
+  box-shadow: 0 0 6px rgba(var(--m-rgb, 57, 255, 122), .45), 0 0 18px rgba(var(--m-rgb, 57, 255, 122), .15);
+  transition: transform .32s cubic-bezier(.2, .9, .25, 1), width .32s cubic-bezier(.2, .9, .25, 1),
+              background-color .32s ease, box-shadow .32s ease, opacity .2s ease;
+}
+.seg-thumb.on { opacity: 1; }
+.seg-thumb.flash { animation: flash .45s ease-out; }
+@keyframes flash { 0%, 55% { filter: brightness(1); } 70% { filter: brightness(1.9); } 100% { filter: brightness(1); } }
 .seg button {
   font: 600 var(--fs-1)/1 var(--mono); color: var(--ink); background: transparent;
   border: 1px solid var(--rule-hi); padding: .7rem 1.1rem; cursor: pointer;
   display: inline-flex; align-items: center;
-  transition: border-color .15s, color .15s, background-color .15s, box-shadow .15s;
+  transition: border-color .25s, color .25s, box-shadow .25s;
 }
 .seg button:hover { border-color: var(--m); color: var(--bright); box-shadow: 0 0 0 1px var(--m) inset; }
 .seg button:active { transform: translateY(1px); }
-.seg button[aria-checked="true"] {
-  background: var(--m); border-color: var(--m); color: var(--ground);
-  box-shadow: 0 0 6px rgba(var(--m-rgb), .45), 0 0 18px rgba(var(--m-rgb), .15);
-}
+.seg button[aria-checked="true"] { border-color: transparent; color: var(--ground); box-shadow: none; }
 .seg button[aria-checked="true"] .swatch { display: none; }  /* the filled button already shows the model */
 .seg-row { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .9rem; margin-top: .3rem; }
 .seg-row .flag { font-size: var(--fs-0); }
@@ -153,7 +182,7 @@ body[data-active="shakespeare"] #try, #how[data-active="shakespeare"] { --accent
 .go {
   font: 600 var(--fs-1)/1 var(--mono); color: var(--ground); background: var(--accent);
   border: 1px solid var(--accent); padding: .8rem 1.1rem; cursor: pointer; white-space: nowrap;
-  box-shadow: var(--glow-accent); transition: filter .15s, transform .1s;
+  box-shadow: var(--glow-accent); transition: filter .15s, transform .1s, background-color .35s, border-color .35s, box-shadow .35s;
 }
 .go:hover { filter: brightness(1.12); }
 .go:active { transform: translateY(1px); }
@@ -224,6 +253,19 @@ body[data-active="shakespeare"] #try, #how[data-active="shakespeare"] { --accent
 .lbox.model { color: var(--bright); background: var(--rule); }
 .lbox.pick { color: var(--ground); background: var(--accent); border-color: var(--accent); font-weight: 600; }
 .arrow { color: var(--accent); font-size: 1.1rem; }
+
+/* one step at a time: the visitor reveals each step with Next */
+.steps .step[hidden] { display: none !important; }
+.step.fresh { animation: reveal .35s ease-out; }
+@keyframes reveal { from { opacity: 0; transform: translateY(8px); } }
+.stepper { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem 1.25rem; }
+.stepper .go { padding: .9rem 1.3rem; }
+.stepper .go::after { content: " →"; }
+.stepper .go.restart::after { content: " ↺"; }
+.textbtn { background: none; border: 0; padding: .4rem 0; cursor: pointer; font: 500 var(--fs-0) var(--mono); color: var(--dim); text-decoration: underline; text-underline-offset: 3px; }
+.textbtn:hover { color: var(--bright); }
+.textbtn[hidden], .stepper .go[hidden] { display: none; }
+.step-count { font-size: var(--fs-0); color: var(--dim); font-variant-numeric: tabular-nums; }
 
 /* ------------------------------------------------------------------ the math, folded under steps 3 and 4 */
 .math { grid-column: 1 / -1; }
@@ -417,4 +459,8 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
   .cursor { animation: none; }
   .loadbar span { transition: none; }
   .math-body { animation: none; }
+  .step.fresh { animation: none; }
+  .seg-thumb { transition: none; }
+  .console-inner, .console-body::after, .pick-label.swap, .steps.switching, .seg-thumb.flash { animation: none !important; }
+  .console-body::after { display: none; }
 }

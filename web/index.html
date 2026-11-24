@@ -47,30 +47,37 @@
   <!-- ============================================================ try -->
   <section id="try" class="block" aria-labelledby="try-h">
     <h2 id="try-h" class="sr">Try it</h2>
-    <div class="console">
+    <div class="console unpicked">
       <div class="console-top">
-        <div class="seg" role="radiogroup" aria-label="Model">
-          <button type="button" role="radio" data-model="tinystories" aria-checked="true"><span class="swatch"></span>TinyStories</button>
-          <button type="button" role="radio" data-model="shakespeare" aria-checked="false"><span class="swatch"></span>Shakespeare</button>
+        <div class="seg-row">
+          <span class="pick-label" id="pick-label">Choose your model:</span>
+          <div class="seg" role="radiogroup" aria-labelledby="pick-label">
+            <button type="button" role="radio" data-model="tinystories" aria-checked="false"><span class="swatch"></span>TinyStories</button>
+            <button type="button" role="radio" data-model="shakespeare" aria-checked="false"><span class="swatch"></span>Shakespeare</button>
+          </div>
         </div>
         <p class="mode" id="mode" aria-live="polite"></p>
       </div>
-      <form class="ask" id="ask">
-        <label class="sr" for="prompt">Starting line</label>
-        <span class="ps1" aria-hidden="true">&gt;</span>
-        <input id="prompt" name="prompt" type="text" autocomplete="off" spellcheck="false" maxlength="200" value="Once upon a time">
-        <button class="go" id="go" type="submit">Generate</button>
-      </form>
-      <p class="notice" id="notice" hidden></p>
-      <div class="examples">
-        <span class="flag">Examples</span>
-        <div class="chips" id="examples"></div>
+      <div class="console-body" id="console-body" inert>
+        <div class="console-inner">
+          <form class="ask" id="ask">
+            <label class="sr" for="prompt">Starting line</label>
+            <span class="ps1" aria-hidden="true">&gt;</span>
+            <input id="prompt" name="prompt" type="text" autocomplete="off" spellcheck="false" maxlength="200" value="Once upon a time">
+            <button class="go" id="go" type="submit">Generate</button>
+          </form>
+          <p class="notice" id="notice" hidden></p>
+          <div class="examples">
+            <span class="flag">Examples</span>
+            <div class="chips" id="examples"></div>
+          </div>
+          <pre class="out" id="out" aria-live="off"></pre>
+          <div class="console-foot">
+            <span id="count"></span>
+          </div>
+          <div class="loadbar" id="loadbar" hidden><span id="loadfill"></span></div>
+        </div>
       </div>
-      <pre class="out" id="out" aria-live="off"></pre>
-      <div class="console-foot">
-        <span id="count"></span>
-      </div>
-      <div class="loadbar" id="loadbar" hidden><span id="loadfill"></span></div>
     </div>
   </section>
 
@@ -176,6 +183,11 @@
         <div class="step-vis loop" id="s5"></div>
       </li>
     </ol>
+    <div class="stepper">
+      <button type="button" class="go" id="next-step">Next step</button>
+      <button type="button" class="textbtn" id="all-steps">Show all steps</button>
+      <span class="step-count" id="step-count" aria-live="polite"></span>
+    </div>
   </section>
 
   <!-- ============================================================ learn -->
