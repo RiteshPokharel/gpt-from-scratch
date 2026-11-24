@@ -3,3 +3,5 @@ __pycache__/
 *.pt
 .DS_Store
 out/train.log
+data/tinystories/
+out/*.log
