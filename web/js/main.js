@@ -26,10 +26,11 @@ scrollTo(0, 0);
 addEventListener("pageshow", () => scrollTo(0, 0));
 // the top-bar links scroll to their section without putting #section in the address
 document.querySelectorAll('.tmux a[href^="#"]').forEach((a) => a.addEventListener("click", (e) => {
-  const target = document.querySelector(a.getAttribute("href"));
-  if (!target) return;
   e.preventDefault();
-  target.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  const behavior = matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+  const href = a.getAttribute("href");
+  if (href === "#top") return scrollTo({ top: 0, behavior }); // the name on the left goes back to the start
+  document.querySelector(href)?.scrollIntoView({ behavior });
 }));
 
 Promise.all([

@@ -453,7 +453,8 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
   background: var(--phos); color: var(--ground);
   font: 500 var(--fs-1)/1 var(--mono);
 }
-.tmux-session { font: 400 1.6rem/1 var(--crt); }
+.tmux-session { font: 400 1.6rem/1 var(--crt); color: var(--ground); text-decoration: none; white-space: nowrap; }
+.tmux-session:hover { text-decoration: underline; text-underline-offset: 4px; }
 .tmux-windows { list-style: none; margin: 0; padding: 0; display: flex; gap: .5rem; }
 /* the two section links are real buttons: dark on the green bar, inverting on hover */
 .tmux-windows a {
