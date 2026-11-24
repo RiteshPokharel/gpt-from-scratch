@@ -22,12 +22,11 @@
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+<canvas class="rain" id="rain" aria-hidden="true"></canvas>
 <a class="skip" href="#try">Skip to the demo</a>
 <nav class="tmux" aria-label="Sections">
   <span class="tmux-session">[gpt]</span>
   <ol class="tmux-windows">
-    <li><a href="#try">Try it</a></li>
-    <li><a href="#models">The models</a></li>
     <li><a href="#how">How it works</a></li>
     <li><a href="#learn">How it learned</a></li>
   </ol>
@@ -37,11 +36,10 @@
 
   <header class="boot">
     <p class="boot-log" aria-hidden="true">
-      <span>[ ok ] apple m5 gpu</span>
       <span>[ ok ] 2 models loaded</span>
     </p>
-    <h1 class="title">gpt-from-scratch</h1>
-    <p class="lede">Two GPT language models built from scratch in PyTorch, following the transformer from the 2017 paper <a href="https://arxiv.org/abs/1706.03762" target="_blank" rel="noopener">Attention Is All You Need</a>, and trained on a laptop. One learned Shakespeare, the other children's stories. Pick one, give it a starting line, and watch it write.</p>
+    <h1 class="title">gpt-from-scratch<span class="title-cursor" aria-hidden="true"></span></h1>
+    <p class="lede">Two GPT language models built from scratch, following the transformer from the 2017 paper <a href="https://arxiv.org/abs/1706.03762" target="_blank" rel="noopener">Attention Is All You Need</a>, and trained on a laptop. One learned Shakespeare, the other children's stories. Pick one, give it a starting line, and watch it write.</p>
   </header>
 
   <!-- ============================================================ try -->
@@ -60,13 +58,18 @@
       </div>
       <div class="console-body" id="console-body" inert>
         <div class="console-inner">
+          <label class="ask-label" for="prompt">Type a starting line and the model will continue it.</label>
           <form class="ask" id="ask">
-            <label class="sr" for="prompt">Starting line</label>
-            <span class="ps1" aria-hidden="true">&gt;</span>
-            <input id="prompt" name="prompt" type="text" autocomplete="off" spellcheck="false" maxlength="200" value="Once upon a time">
-            <button class="go" id="go" type="submit">Generate</button>
+            <div class="field">
+              <span class="ps1" aria-hidden="true">&gt;</span>
+              <input id="prompt" name="prompt" type="text" autocomplete="off" spellcheck="false" maxlength="200" value="">
+              <button class="go" id="go" type="submit">Generate</button>
+            </div>
           </form>
-          <p class="notice" id="notice" hidden></p>
+          <div class="loading" id="loading" role="progressbar" aria-label="Loading the model" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden>
+            <div class="load-name" id="load-text">loading</div>
+            <div class="load-line"><span class="load-bar" id="load-bar" aria-hidden="true"></span><span class="load-pct" id="load-pct">0%</span></div>
+          </div>
           <div class="examples">
             <span class="flag">Examples</span>
             <div class="chips" id="examples"></div>
@@ -75,7 +78,6 @@
           <div class="console-foot">
             <span id="count"></span>
           </div>
-          <div class="loadbar" id="loadbar" hidden><span id="loadfill"></span></div>
         </div>
       </div>
     </div>
@@ -95,7 +97,6 @@
   <section id="how" class="block" aria-labelledby="how-h" data-active="tinystories">
     <div class="sec-head">
       <h2 id="how-h">What happens when you press Generate</h2>
-      <p class="intro" id="how-intro">The model writes one small piece at a time. Here is how it picks the next one, step by step, for a fixed example.</p>
       <div class="seg-row">
         <span class="flag" id="how-seg-label">Show the example for:</span>
         <div class="seg" id="how-seg" role="radiogroup" aria-labelledby="how-seg-label">
@@ -103,6 +104,7 @@
           <button type="button" role="radio" data-model="shakespeare" aria-checked="false"><span class="swatch"></span>Shakespeare</button>
         </div>
       </div>
+      <p class="intro" id="how-intro">The model writes one small piece at a time. Here is how it picks the next one, step by step, for a fixed example.</p>
     </div>
     <ol class="steps">
       <li class="step">
@@ -183,11 +185,6 @@
         <div class="step-vis loop" id="s5"></div>
       </li>
     </ol>
-    <div class="stepper">
-      <button type="button" class="go" id="next-step">Next step</button>
-      <button type="button" class="textbtn" id="all-steps">Show all steps</button>
-      <span class="step-count" id="step-count" aria-live="polite"></span>
-    </div>
   </section>
 
   <!-- ============================================================ learn -->
@@ -198,12 +195,12 @@
     </div>
     <div class="replay">
       <div class="replay-ctl">
-        <label class="field-label" for="replay-slider">TinyStories, training step</label>
+        <label class="slide-hint" for="replay-slider">◀ Drag the slider to travel through training ▶</label>
         <input type="range" id="replay-slider" min="0" max="0" step="1" value="0">
         <div class="readout"><span class="big" id="replay-step">0</span><span class="unit">step</span><span class="big" id="replay-val">0.00</span><span class="unit">loss</span></div>
       </div>
       <pre class="out replay-out" id="replay-out"></pre>
-      <p class="note">The story it wrote every 500 steps while training. Drag back to step 0 to see where it started: random noise.</p>
+      <p class="note">The story it wrote every 500 steps while training, from random noise at step 0 to real stories.</p>
     </div>
     <div class="charts">
       <figure class="chart" data-model="shakespeare" id="chart-char">

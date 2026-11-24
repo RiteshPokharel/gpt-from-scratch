@@ -1,4 +1,7 @@
 import { lineChart, legend } from "./charts.js";
+import { startRain } from "./rain.js";
+
+startRain(document.getElementById("rain"));
 import { makeBPE, showWhitespace } from "./tokenizer.js";
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -15,6 +18,19 @@ const getJSON = (path) => fetch(path).then((r) => {
   if (!r.ok) throw new Error(`${path}: ${r.status}`);
   return r.json();
 });
+
+// Always open at the top: browsers otherwise jump back to the last scroll position or to a #section in the address.
+if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+scrollTo(0, 0);
+addEventListener("pageshow", () => scrollTo(0, 0));
+// the top-bar links scroll to their section without putting #section in the address
+document.querySelectorAll('.tmux a[href^="#"]').forEach((a) => a.addEventListener("click", (e) => {
+  const target = document.querySelector(a.getAttribute("href"));
+  if (!target) return;
+  e.preventDefault();
+  target.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+}));
 
 Promise.all([
   getJSON("data/models.json"), getJSON("data/recordings.json"), getJSON("data/replay.json"),
@@ -33,12 +49,12 @@ Promise.all([
   };
   howSeg.forEach((b) => b.addEventListener("click", () => showExample(b.dataset.model)));
   showExample("tinystories");
-  stepper();
   charts(models);
   replayer(replay);
   compare(models, merges);
   statusBar(models);
   navHighlight();
+  scrollTo(0, 0);
 }).catch((err) => {
   $("#mode").textContent = `Could not load the page data (${err.message}). If you opened the file directly, serve the folder instead: python3 -m http.server -d web`;
 });
@@ -46,83 +62,209 @@ Promise.all([
 /* ================================================================ the demo */
 function demo(recordings, manifests) {
   // no model is selected until the visitor picks one
-  const state = { model: null, workers: {}, ready: {}, timer: null, last: null, variant: {}, speed: {}, runId: 0, loading: null, typed: false };
-  const DEFAULT_LINE = { tinystories: "Once upon a time", shakespeare: "ROMEO:" };
-  const input = $("#prompt"), go = $("#go"), out = $("#out"), notice = $("#notice");
+  const state = { model: null, workers: {}, ready: {}, timer: null, last: null, variant: {}, runId: 0, loading: null };
+  const input = $("#prompt"), go = $("#go"), out = $("#out");
 
-  // choosing a model: the label switches from "Choose your model:" to "You chose:"
+  // choosing a model: the label switches from "Choose your model:" to "Your chosen model:"
   const seg = [...document.querySelectorAll("#try .seg [role=radio]")];
   function selectModel(name) {
     if (name === state.model) return;
     state.model = name;
     seg.forEach((x) => x.setAttribute("aria-checked", x.dataset.model === name));
+    showExamples(name);
     $(".console").dataset.active = name;
     document.body.dataset.active = name;
     moveThumb($("#try .seg"));
     if ($(".console").classList.contains("unpicked")) {
       const label = $("#pick-label");
-      label.textContent = "You chose:";
+      label.textContent = "Your chosen model:"; // same length as "Choose your model:", so nothing shifts
       label.classList.add("swap");
       $(".console").classList.remove("unpicked");
       $(".console").classList.add("revealed");
       $("#console-body").inert = false;
     }
-    if (!state.typed || !input.value.trim()) input.value = DEFAULT_LINE[name];
-    run(input.value);
+    // nothing runs (or downloads) until Generate: switching just stops the current text and clears it
+    state.runId++; clearInterval(state.timer); if (!state.loading) meter.stop();
+    out.textContent = ""; $("#count").textContent = "";
+    input.focus();
   }
   seg.forEach((b) => b.addEventListener("click", () => selectModel(b.dataset.model)));
 
-  // examples
-  recordings.prompts.forEach((p) => {
-    const b = document.createElement("button");
-    b.type = "button"; b.className = "chip"; b.textContent = p.replace(/\n/g, "↵");
-    b.addEventListener("click", () => { input.value = p; state.typed = true; run(p); });
-    $("#examples").append(b);
-  });
+  // three examples that suit the chosen model; tapping one fills the box, Generate runs it
+  const EXAMPLES = {
+    tinystories: ["Once upon a time", "The little girl", "One day, a big bear"],
+    shakespeare: ["ROMEO:", "To be, or not to be", "KING RICHARD III:"],
+  };
+  function showExamples(name) {
+    $("#examples").replaceChildren(...EXAMPLES[name].map((p) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "chip"; b.textContent = p;
+      b.addEventListener("click", () => { input.value = p; labels(); input.focus(); });
+      return b;
+    }));
+  }
 
   $("#ask").addEventListener("submit", (e) => { e.preventDefault(); run(input.value); });
-  input.addEventListener("input", () => { state.typed = true; labels(); });
+  input.addEventListener("input", labels);
 
   const recorded = (prompt) => recordings.models[state.model].runs[prompt];
 
   function labels() {
     if (!state.model) return;
-    const live = state.ready[state.model];
-    const size = mb(manifests[state.model].bytes);
-    const again = state.last === `${state.model}|${input.value}`;
-    const own = !live && !recorded(input.value) && input.value.trim() !== "";
-    go.textContent = own ? "Load model and generate" : again ? "Write another" : "Generate";
-    // the download is only mentioned once someone types their own line
-    notice.hidden = !own || !!state.loading;
-    notice.innerHTML = `<span class="tag">[note]</span> To write from your own text, the model runs here in your browser. It loads once (${size}) and stays in this tab only. Nothing is installed.`;
-    go.disabled = !!state.loading;
-    const speed = state.speed[state.model];
-    $("#mode").innerHTML = live
-      ? `<span class="tag">[live]</span> ${state.model} · ${size} in this tab${speed ? ` · ${fmt(speed)} tokens/s` : ""}`
-      : `<span class="tag">[recorded]</span> saved run · type your own line to run it live`;
-    [...$("#examples").children].forEach((c, i) => c.setAttribute("aria-pressed", recordings.prompts[i] === input.value));
+    go.disabled = !!state.loading; // own text: Generate loads the model (with the progress bar)
+    [...$("#examples").children].forEach((c) => c.setAttribute("aria-pressed", c.textContent === input.value));
+  }
+
+  // ---------------------------------------------------------------- the progress bar under the text box
+  // Two ways to move:
+  //  - "curve" (nothing to download): races toward ~97% (fast, then slower), 100% when finish() is called
+  //  - "download": follows the real download, scaled so a complete download is 90%;
+  //    then finish() counts 91, 92 ... 100 over 3 seconds
+  const meter = (() => {
+    const el = $("#loading"), line = $("#load-bar");
+    let n = 20, shown = 0, real = 0, finished = false, frame = 0, started = 0, tau = 1, onDone = null, gen = 0;
+    let mode = "curve", tailStart = 0, words = null, wordAt = -1;
+    const TAIL_MS = 3000;
+    const cells = () => {
+      const probe = document.createElement("span");
+      probe.textContent = "█".repeat(20);
+      line.replaceChildren(probe);
+      const w = probe.getBoundingClientRect().width / 20 || 8;
+      return Math.max(10, Math.floor((el.clientWidth * 0.5) / w) - 2); // about half the box wide
+    };
+    const draw = (f) => {
+      const pct = Math.round(f * 100), on = Math.round(f * n);
+      line.innerHTML = `[${"█".repeat(on)}<span class="off">${"░".repeat(n - on)}</span>]`;
+      $("#load-pct").textContent = `${pct}%`;
+      el.setAttribute("aria-valuenow", pct);
+    };
+    const tick = () => {
+      const now = performance.now();
+      if (words && !finished) { // fixed-length runs share the 3 seconds; downloads keep cycling until done
+        const k = mode === "download"
+          ? Math.floor((now - started) / 1500) % words.length // 1.5 s per word while downloading
+          : Math.min(words.length - 1, Math.floor((now - started) / (WAIT_MS / words.length)));
+        if (k !== wordAt) { wordAt = k; $("#load-text").textContent = words[k]; }
+      }
+      if (mode === "download") {
+        if (finished) shown = Math.max(shown, 0.9 + 0.1 * Math.min(1, (now - tailStart) / TAIL_MS)); // 91 ... 100
+        else shown = Math.max(shown, shown + (0.9 * real - shown) * 0.2); // glides after the real download
+      } else {
+        const curve = 0.97 * (1 - Math.exp(-(now - started) / 1000 / tau));
+        shown = finished ? Math.min(1, shown + 0.06) : Math.max(shown, Math.min(0.97, Math.max(curve, real)));
+      }
+      draw(shown);
+      if (finished && shown >= 1) { const f = onDone; onDone = null; f?.(); return; }
+      frame = requestAnimationFrame(tick);
+    };
+    return {
+      start(label, opts = {}) {
+        gen++; cancelAnimationFrame(frame);
+        tau = opts.tau || 1.1; mode = opts.mode || "curve"; words = opts.words || null; wordAt = -1;
+        real = 0; shown = 0; finished = false; onDone = null; started = performance.now();
+        $("#load-text").textContent = label;
+        el.hidden = false; n = cells(); draw(0);
+        if (!reduceMotion) frame = requestAnimationFrame(tick);
+      },
+      set(f) { real = f; if (reduceMotion) draw(mode === "download" ? 0.9 * f : f); },
+      // complete no sooner than minMs after start, run up to 100%, hold a moment, then hide
+      finish(minMs = 0) {
+        const mine = gen;
+        return new Promise((resolve) => {
+          setTimeout(() => {
+            if (mine !== gen) return; // a newer start took over the bar
+            finished = true; real = 1; tailStart = performance.now();
+            if (mode === "download") shown = Math.max(shown, 0.9);
+            const end = () => setTimeout(() => { if (mine === gen) el.hidden = true; resolve(); }, 300);
+            if (reduceMotion) { draw(1); end(); } else onDone = end;
+          }, mode === "download" ? 0 : Math.max(0, minMs - (performance.now() - started)));
+        });
+      },
+      stop() { gen++; cancelAnimationFrame(frame); el.hidden = true; },
+    };
+  })();
+  const WAIT_MS = 3000; // every Generate takes about this long before text appears
+
+  // what the bar says while it runs: things a model really does (plus a little fun), never the same twice in a row
+  const WORDS = {
+    all: ["Tokenizing…", "Embedding…", "Attending…", "Softmaxing…", "Sampling…", "Consulting the weights…",
+      "Multiplying matrices…", "Normalizing layers…", "Warming up the attention heads…", "Brewing logits…",
+      "Untangling vectors…", "Pondering probabilities…", "Masking the future…", "Adding residuals…",
+      "Querying keys…", "Valuing values…", "Projecting heads…", "Stacking layers…", "Dot-producting…",
+      "Scaling by √64…", "Exponentiating…", "Dividing by the total…", "Rolling weighted dice…",
+      "Looking back 256 tokens…", "Encoding positions…", "Activating GELUs…", "Crunching floats…",
+      "Reading the context…", "Weighing every word…", "Feeding forward…", "Merging heads…",
+      "Not peeking ahead…", "Predicting the next token…", "Warming up your CPU…", "Shuffling bytes…",
+      "Discombobulating…", "Cogitating…", "Ruminating…", "Percolating…", "Noodling…", "Mulling it over…",
+      "Contemplating…", "Deliberating…", "Synthesizing…", "Calibrating…", "Recombobulating…", "Musing…",
+      "Waking the transformer…", "Unpacking the weights…", "Dequantizing int8…", "Allocating Float32Arrays…",
+      "Spinning up a web worker…", "Warming the KV cache…", "Decoding bytes…", "Merging byte pairs…",
+      "Building the vocabulary…", "Unrolling the context…", "Counting attention heads…", "Stretching the embeddings…",
+      "Lining up the layers…", "Polishing probabilities…", "Herding tensors…", "Tuning the temperature…",
+      "Consulting the loss curve…", "Remembering 2.7 million stories…", "Folding matrices…", "Aligning dimensions…",
+      "Summoning the softmax…", "Greasing the gradients…", "Charging the residuals…", "Defragmenting thoughts…"],
+    tinystories: ["Once-upon-a-time-ing…", "Sharpening crayons…", "Finding a moral…", "Naming the dog…",
+      "Rummaging through 27 million numbers…", "Petting the cat…", "Building a sandcastle…",
+      "Finding the lost ball…", "Saying sorry nicely…", "Sharing the toys…", "Going to the park…",
+      "Asking Mom…", "Tying shoelaces…", "Counting to ten…", "Planting a little seed…",
+      "Finding a happy ending…", "Feeding the ducks…", "Drawing with chalk…", "Looking for the cat…",
+      "Baking cookies with Grandma…", "Climbing the big tree…", "Learning to be kind…", "Hugging the teddy bear…"],
+    shakespeare: ["Thou-ing and thee-ing…", "Sharpening the quill…", "Consulting the Bard…", "Iambic-pentametering…",
+      "Rummaging through 10.8 million numbers…", "Wherefore-ing…", "Exiting, pursued by a bear…",
+      "Rhyming couplets…", "Doth-ing and hath-ing…", "Summoning a soliloquy…", "Plotting a tragedy…",
+      "Calling the Nurse…", "Forsooth-ing…", "Drawing daggers…", "Raising the curtain…",
+      "Brooding on the balcony…", "Composing a sonnet…", "Waiting in the wings…", "Bowing to the King…",
+      "Speaking in verse…", "Writing stage directions…", "Swearing by the moon…", "Rehearsing Act III…"],
+  };
+  const PER_RUN = 3; // one a second across the 3-second start
+  const recent = new Set(); // words shown lately, skipped next time
+  const shuffle = (a) => a.map((x) => [Math.random(), x]).sort((p, q) => p[0] - q[0]).map((x) => x[1]);
+  function statusWords(model, count = PER_RUN) {
+    const pick = (pool, k) => {
+      const fresh = shuffle(pool.filter((w) => !recent.has(w)));
+      return (fresh.length >= k ? fresh : shuffle(pool)).slice(0, k);
+    };
+    const nOwn = Math.max(1, Math.round(count * (0.2 + Math.random() * 0.2))); // a few that only fit this model
+    const chosen = shuffle([...pick(WORDS[model], nOwn), ...pick(WORDS.all, count - nOwn)]);
+    chosen.forEach((w) => recent.add(w));
+    while (recent.size > 24) recent.delete(recent.values().next().value); // remember the last ~5 runs
+    return chosen;
   }
 
   function loadLive(name) {
     if (state.ready[name]) return Promise.resolve();
     if (state.workers[name]) return state.workers[name].loading;
     const worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module" });
-    const bar = $("#loadbar"), fill = $("#loadfill");
+    const total = manifests[name].bytes;
     state.loading = name; labels();
-    bar.hidden = false; fill.style.width = "0%";
-    $("#mode").innerHTML = `<span class="tag">[loading]</span> ${name} · ${mb(0)} of ${mb(manifests[name].bytes)}`;
+    // a download can take a while: go through every word once before any repeats
+    const words = shuffle([...WORDS.all, ...WORDS[name]]);
+    meter.start(words[0], { mode: "download", words });
     const loading = new Promise((resolve, reject) => {
+      let last = performance.now(), done = false;
+      const fail = (message) => {
+        if (done) return;
+        done = true; clearInterval(watchdog); worker.terminate(); meter.stop();
+        state.loading = null; delete state.workers[name];
+        $("#mode").textContent = `The model could not load (${message}). Try again, or use another browser.`;
+        go.disabled = false;
+        reject(new Error(message));
+      };
+      // never sit at 0% forever: give up if nothing arrives for 20 seconds
+      const watchdog = setInterval(() => { if (performance.now() - last > 20000) fail("no data for 20 seconds"); }, 2000);
+      worker.onerror = (e) => { e.preventDefault?.(); fail(e.message || "the loader could not start in this browser"); };
+      worker.onmessageerror = () => fail("the model data could not be read");
       worker.onmessage = ({ data }) => {
+        last = performance.now();
         if (data.type === "progress") {
-          fill.style.width = `${(data.loaded / data.total) * 100}%`;
-          $("#mode").innerHTML = `<span class="tag">[loading]</span> ${name} · ${mb(data.loaded)} of ${mb(data.total)}`;
+          meter.set(data.loaded / total);
         } else if (data.type === "ready") {
-          state.ready[name] = true; state.loading = null; bar.hidden = true; labels(); resolve();
+          done = true; clearInterval(watchdog);
+          meter.finish(WAIT_MS).then(() => {
+            state.ready[name] = true; state.loading = null; labels(); resolve();
+          });
         } else if (data.type === "error") {
-          state.loading = null; bar.hidden = true; delete state.workers[name];
-          $("#mode").textContent = `The model could not load (${data.message}). Check your connection and try again.`;
-          go.disabled = false;
-          reject(new Error(data.message));
+          fail(data.message);
         }
       };
     });
@@ -162,11 +304,17 @@ function demo(recordings, manifests) {
     if (!prompt.trim()) { input.focus(); return; }
     const id = ++state.runId;
     clearInterval(state.timer);
+    $("#mode").textContent = ""; // only ever shows a problem; clear it for the new run
+    out.textContent = ""; $("#count").textContent = ""; // the old text goes at once, even while the model loads
     const rec = !state.ready[state.model] && recorded(prompt);
     if (!state.ready[state.model] && !rec) {
-      try { await loadLive(state.model); } catch { return; }
-      if (id !== state.runId) return;
+      try { await loadLive(state.model); } catch { return; } // the download itself shows the bar
+    } else {
+      const words = statusWords(state.model);
+      meter.start(words[0], { tau: 1.1, words });
+      await meter.finish(WAIT_MS);
     }
+    if (id !== state.runId) return;
     state.last = `${state.model}|${prompt}`;
     labels();
     const view = startOutput(prompt);
@@ -185,19 +333,11 @@ function demo(recordings, manifests) {
       return;
     }
     const { worker } = state.workers[state.model];
-    let analysis = null, first = true, t0 = 0;
-    const n = recordings.models[state.model].length, model = state.model;
+    const n = recordings.models[state.model].length;
     worker.onmessage = ({ data }) => {
       if (data.id !== id || id !== state.runId) return; // a run that was replaced
-      if (data.type === "analysis") analysis = data.analysis;
-      else if (data.type === "pieces") {
-        if (first) { first = false; t0 = performance.now(); }
-        data.pieces.forEach((p) => addPiece(view, p));
-      } else if (data.type === "done") {
-        const secs = (performance.now() - t0) / 1000;
-        if (secs > 0.2) state.speed[model] = Math.round(view.tokens / secs); // measured on this visitor's machine
-        finish(view);
-      }
+      if (data.type === "pieces") data.pieces.forEach((p) => addPiece(view, p));
+      else if (data.type === "done") finish(view);
       else if (data.type === "error") { $("#mode").textContent = `Something went wrong: ${data.message}`; finish(view); }
     };
     worker.postMessage({ type: "run", text: prompt, n, id });
@@ -207,32 +347,6 @@ function demo(recordings, manifests) {
 }
 
 /* ================================================================ the five steps */
-// "How it works" opens on step 1; the visitor reveals the rest one step at a time.
-function stepper() {
-  const steps = [...document.querySelectorAll(".steps .step")];
-  const next = $("#next-step"), all = $("#all-steps");
-  let shown = 1;
-  const render = (focusNew) => {
-    steps.forEach((li, i) => { li.hidden = i >= shown; });
-    const done = shown >= steps.length;
-    next.textContent = done ? "Start over" : `Next: ${steps[shown].querySelector("h3").textContent}`;
-    next.classList.toggle("restart", done);
-    all.hidden = done;
-    $("#step-count").textContent = `step ${shown} of ${steps.length}`;
-    if (focusNew) {
-      const li = steps[shown - 1];
-      li.classList.remove("fresh"); void li.offsetWidth; li.classList.add("fresh");
-      li.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
-    }
-  };
-  next.addEventListener("click", () => {
-    if (shown >= steps.length) { shown = 1; render(false); $("#how").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth" }); return; }
-    shown++; render(true);
-  });
-  all.addEventListener("click", () => { shown = steps.length; render(false); });
-  render(false);
-}
-
 // One fixed example per model (recorded by record_demo.mjs), the same for every visitor.
 function explain(a, prompt, model) {
   const isChar = model === "shakespeare";
@@ -298,11 +412,13 @@ function explain(a, prompt, model) {
     $("#m4-note").innerHTML = `${sci(lnTotal)} is the sum of e<sup>z</sup> over all ${fmt(vocab)} tokens. The other ${fmt(vocab - 5)} tokens share what is left: ${(100 - rowsSm.reduce((x, t) => x + t.p * 100, 0)).toFixed(1)}%. Real implementations subtract the biggest score first so these numbers never overflow; the result is the same.`;
   }
 
-  // 5. the loop
+  // 5. the loop: only the end of the line (what matters for the next token), line breaks shown as ↵
+  const flat = prompt.replace(/\n/g, " ↵ ");
+  const tail = flat.length > 24 ? `…${flat.slice(-22).trimStart()}` : flat;
   const second = a.top[1];
   $("#s5").innerHTML = `
-    <div class="loop-row"><span class="lbox">${esc(prompt)}</span><span class="arrow">→</span><span class="lbox model">model</span><span class="arrow">→</span><span class="lbox pick">${esc(vis(firstPiece))}</span></div>
-    <div class="loop-row"><span class="lbox">${esc(prompt)}<b>${esc(firstPiece)}</b></span><span class="arrow">↺</span><span class="dim">back to step 1, until the story ends</span></div>`;
+    <div class="loop-row"><span class="lbox">${esc(tail)}</span><span class="arrow">→</span><span class="lbox model">model</span><span class="arrow">→</span><span class="lbox pick">${esc(vis(firstPiece))}</span></div>
+    <div class="loop-row"><span class="lbox">${esc(tail)}<b>${esc(firstPiece)}</b></span><span class="arrow">↺</span><span class="dim">back to step 1, ${isChar ? "one letter at a time" : "until the story ends"}</span></div>`;
   const pct = (p) => (p * 100 >= 1 ? `${Math.round(p * 100)}%` : `${(p * 100).toFixed(1)}%`);
   $("#s5-text").textContent = `It picks a token at random, weighted by those chances. Here it picked "${firstPiece.trim() || vis(firstPiece)}", but "${second.text.trim() || vis(second.text)}" would still win ${pct(second.p)} of the time, which is why every run writes something different. Then it adds the token to the text and starts again from step 1, once for every token it writes.`;
 }
@@ -340,7 +456,7 @@ function charts(m) {
 function replayer(replay) {
   const slider = $("#replay-slider");
   slider.max = replay.length - 1;
-  slider.value = replay.length - 1; // start on the latest story; dragging back shows the noise it began from
+  slider.value = 0; // starts at step 0: random noise
   const show = () => {
     const r = replay[+slider.value];
     $("#replay-step").textContent = fmt(r.step);

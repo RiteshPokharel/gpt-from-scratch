@@ -35,6 +35,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }  /* hidden always wins over a component's own display */
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; scroll-behavior: smooth; scroll-padding-top: calc(var(--bar-h) + 1.5rem + env(safe-area-inset-top, 0px)); }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 
@@ -53,6 +54,9 @@ body::after {   /* the tube: faint scanlines and a vignette */
     repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0) 0 2px, rgba(0, 0, 0, .16) 2px 3px),
     radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 55%, rgba(0, 0, 0, .55) 100%);
 }
+/* the falling-characters background sits behind everything, faint */
+.rain { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; opacity: .5; }  /* glyphs draw at ~56%, so the usual look is unchanged and the cursor can light them up */
+.screen, .tmux { position: relative; z-index: 1; }
 ::selection { background: var(--phos); color: var(--ground); }
 a { color: var(--phos); }
 b { font-weight: 600; color: var(--bright); }
@@ -96,6 +100,10 @@ body[data-active="shakespeare"] #try, #how[data-active="shakespeare"] { --accent
 .boot-log span:nth-child(2) { animation-delay: .4s; }
 @keyframes boot { to { opacity: 1; } }
 .title { margin: 0; font: 400 clamp(3.25rem, 11vw, 7.5rem)/.85 var(--crt); color: var(--phos); text-shadow: var(--glow-phos); overflow-wrap: anywhere; }
+.title-cursor {  /* a terminal cursor after the name */
+  display: inline-block; width: .45em; height: .8em; margin-left: .06em; vertical-align: -.06em;
+  background: var(--phos); box-shadow: 0 0 6px rgba(57, 255, 122, .6); animation: blink 1s steps(1) infinite;
+}
 .lede { margin: 0; max-width: var(--measure); font-size: var(--fs-2); }
 .lede a { color: var(--phos); text-decoration: underline; text-decoration-color: rgba(57, 255, 122, .4); text-underline-offset: 3px; }
 .lede a:hover { text-decoration-color: var(--phos); color: var(--bright); }
@@ -140,11 +148,10 @@ body[data-active="shakespeare"] #try, #how[data-active="shakespeare"] { --accent
 /* before a model is chosen, only the choice is shown */
 .console.unpicked { border-top-color: var(--rule-hi); }
 .console.unpicked .console-top { padding-block: 1.5rem; }
-.console.unpicked .mode { display: none; }
-.pick-label { font-size: var(--fs-1); font-weight: 600; color: var(--bright); }
+.pick-label { font-size: var(--fs-1); font-weight: 600; color: var(--bright); min-width: 18ch; }
 .console-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem 1.5rem; padding-block: 1rem .25rem; }
 /* model switch: a coloured thumb slides behind the chosen button */
-.seg { display: inline-flex; gap: .4rem; position: relative; isolation: isolate; }
+.seg { display: inline-grid; grid-template-columns: 1fr 1fr; gap: .4rem; position: relative; isolation: isolate; }  /* equal widths: nothing moves on switch */
 .seg-thumb {
   position: absolute; z-index: -1; top: 0; left: 0; height: 0; width: 0;
   background: var(--m, var(--phos)); opacity: 0;
@@ -158,28 +165,36 @@ body[data-active="shakespeare"] #try, #how[data-active="shakespeare"] { --accent
 .seg button {
   font: 600 var(--fs-1)/1 var(--mono); color: var(--ink); background: transparent;
   border: 1px solid var(--rule-hi); padding: .7rem 1.1rem; cursor: pointer;
-  display: inline-flex; align-items: center;
+  display: inline-flex; align-items: center; justify-content: center; text-align: center;
   transition: border-color .25s, color .25s, box-shadow .25s;
 }
 .seg button:hover { border-color: var(--m); color: var(--bright); box-shadow: 0 0 0 1px var(--m) inset; }
 .seg button:active { transform: translateY(1px); }
 .seg button[aria-checked="true"] { border-color: transparent; color: var(--ground); box-shadow: none; }
-.seg button[aria-checked="true"] .swatch { display: none; }  /* the filled button already shows the model */
+.seg button[aria-checked="true"] .swatch { background: var(--ground); box-shadow: none; }  /* the icon stays, so nothing shifts */
 .seg-row { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .9rem; margin-top: .3rem; }
 .seg-row .flag { font-size: var(--fs-0); }
-.mode { margin: 0; font-size: var(--fs-0); color: var(--dim); max-width: 46ch; }
+.mode { margin: 0; font-size: var(--fs-0); color: var(--warn); max-width: 52ch; }
+.mode:empty { display: none; }
 .mode { font-variant-numeric: tabular-nums; }
 .mode .tag { color: var(--accent); font-weight: 600; }
 
-.ask { display: flex; align-items: center; gap: .6rem; padding-block: 1rem .75rem; }
-.ask .ps1 { color: var(--accent); font: 400 1.6rem/1 var(--crt); }
-.ask input {
-  flex: 1; min-width: 0;
-  background: var(--ground); color: var(--bright); caret-color: var(--accent);
-  border: 1px solid var(--rule-hi); padding: .75rem .85rem;
-  font: 400 var(--fs-2)/1.3 var(--mono);
+/* one box: the text on the left, Generate inside it on the right */
+.ask { padding-block: .5rem .75rem; }
+.field {
+  display: flex; align-items: center; gap: .5rem; padding: 4px 4px 4px .85rem;
+  background: var(--ground); border: 1px solid var(--rule-hi);
+  transition: border-color .2s, box-shadow .2s;
 }
-.ask input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.field:focus-within { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.field .ps1 { color: var(--accent); font: 400 1.5rem/1 var(--crt); }
+.field input {
+  flex: 1; min-width: 0; padding: .6rem 0;
+  background: transparent; color: var(--bright); caret-color: var(--accent);
+  border: 0; font: 400 var(--fs-2)/1.3 var(--mono);
+}
+.field input:focus { outline: none; }
+.ask-label { display: block; padding-top: 1rem; font-size: var(--fs-text); color: var(--ink); }
 .go {
   font: 600 var(--fs-1)/1 var(--mono); color: var(--ground); background: var(--accent);
   border: 1px solid var(--accent); padding: .8rem 1.1rem; cursor: pointer; white-space: nowrap;
@@ -188,9 +203,6 @@ body[data-active="shakespeare"] #try, #how[data-active="shakespeare"] { --accent
 .go:hover { filter: brightness(1.12); }
 .go:active { transform: translateY(1px); }
 .go:disabled { opacity: .5; cursor: progress; }
-/* sits right under the Generate button it explains */
-.notice { justify-self: end; max-width: 50ch; margin: -.35rem 1.1rem .8rem; padding: .55rem .75rem !important; border: 1px dashed var(--accent); color: var(--ink); font-size: var(--fs-0); line-height: 1.6; }
-.notice .tag { color: var(--accent); font-weight: 600; }
 .examples { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .8rem; padding-bottom: .5rem; }
 
 .out {
@@ -200,13 +212,21 @@ body[data-active="shakespeare"] #try, #how[data-active="shakespeare"] { --accent
   min-height: 15rem; color: var(--ink);
   border-top: 1px solid var(--rule);
 }
+/* the output area only exists once there is text: no empty box while waiting */
+.console .out { min-height: 0; }
+.console .out:empty, .console-foot:has(#count:empty) { display: none; }
 .out .p { color: var(--bright); font-weight: 600; }
 .out .eot { font-size: var(--fs-0); color: var(--ground); background: var(--warn); padding: 0 .35em; margin: 0 .2em; white-space: nowrap; }
 .cursor { display: inline-block; width: .6em; height: 1.1em; vertical-align: text-bottom; margin-left: 1px; background: var(--accent); box-shadow: var(--glow-accent); animation: blink 1s steps(1) infinite; }
 @keyframes blink { 50% { opacity: 0; } }
 .console-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .5rem 1rem; align-items: center; padding-block: .6rem; border-top: 1px solid var(--rule); font-size: var(--fs-0); color: var(--dim); font-variant-numeric: tabular-nums; }
-.loadbar { height: 3px; padding: 0 !important; background: var(--rule); }
-.loadbar span { display: block; height: 100%; width: 0; background: var(--accent); box-shadow: var(--glow-accent); transition: width .2s; }
+/* model loading: a short text progress bar, like a command-line download */
+.loading { display: grid; gap: .15rem; margin: -.2rem 0 .9rem; font: 400 var(--fs-0)/1.5 var(--mono); font-variant-numeric: tabular-nums; }
+.load-name { color: var(--bright); }
+.load-line { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: .7rem; }
+.load-bar { color: var(--accent); white-space: pre; }
+.load-bar .off { color: var(--rule-hi); }
+.load-pct { color: var(--accent); font-weight: 600; min-width: 4ch; }
 
 /* ------------------------------------------------------------------ the five steps */
 .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 3rem; counter-reset: step; }
@@ -250,23 +270,10 @@ body[data-active="shakespeare"] #try, #how[data-active="shakespeare"] { --accent
 .loop { display: grid; gap: .8rem; }
 .loop-row { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; font-size: var(--fs-0); }
 .lbox { border: 1px solid var(--rule-hi); padding: .45rem .65rem; color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; }
-.lbox b { color: var(--accent); }
+.lbox b { color: var(--accent); font-weight: inherit; text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; }  /* the token it just added */
 .lbox.model { color: var(--bright); background: var(--rule); }
-.lbox.pick { color: var(--ground); background: var(--accent); border-color: var(--accent); font-weight: 600; }
+.lbox.pick { color: var(--ground); background: var(--accent); border-color: var(--accent); font-weight: 600; min-width: 2.6em; text-align: center; white-space: pre; }
 .arrow { color: var(--accent); font-size: 1.1rem; }
-
-/* one step at a time: the visitor reveals each step with Next */
-.steps .step[hidden] { display: none !important; }
-.step.fresh { animation: reveal .35s ease-out; }
-@keyframes reveal { from { opacity: 0; transform: translateY(8px); } }
-.stepper { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem 1.25rem; }
-.stepper .go { padding: .9rem 1.3rem; }
-.stepper .go::after { content: " →"; }
-.stepper .go.restart::after { content: " ↺"; }
-.textbtn { background: none; border: 0; padding: .4rem 0; cursor: pointer; font: 500 var(--fs-0) var(--mono); color: var(--dim); text-decoration: underline; text-underline-offset: 3px; }
-.textbtn:hover { color: var(--bright); }
-.textbtn[hidden], .stepper .go[hidden] { display: none; }
-.step-count { font-size: var(--fs-0); color: var(--dim); font-variant-numeric: tabular-nums; }
 
 /* ------------------------------------------------------------------ the math, folded under steps 3 and 4 */
 .math { grid-column: 1 / -1; }
@@ -328,12 +335,30 @@ body[data-active="shakespeare"] #try, #how[data-active="shakespeare"] { --accent
 
 /* ------------------------------------------------------------------ training */
 .replay { display: grid; gap: .8rem; }
-.replay-ctl { display: grid; grid-template-columns: auto 1fr auto; gap: .5rem 1.25rem; align-items: center; }
+.replay-ctl { display: grid; grid-template-columns: 1fr auto; gap: .5rem 1.25rem; align-items: center; }
 .readout { display: flex; align-items: baseline; gap: .4rem; font-variant-numeric: tabular-nums; }
 .readout .big { font: 400 2.1rem/1 var(--crt); color: var(--phos); text-shadow: var(--glow-phos); min-width: 3.2ch; text-align: right; }
 .readout .unit { color: var(--dim); font-size: var(--fs-0); margin-right: .8rem; }
 .replay-out { background: var(--panel); border: 1px solid var(--rule); border-top: 2px solid var(--phos); padding-inline: 1.1rem; min-height: 11rem; }
-input[type="range"] { width: 100%; accent-color: var(--phos); height: 2.25rem; margin: 0; }
+/* the training slider: a big glowing handle so it clearly looks draggable */
+.slide-hint { grid-column: 1 / -1; color: var(--phos); font: 600 var(--fs-1)/1.4 var(--mono); }
+input[type="range"] {
+  -webkit-appearance: none; appearance: none; width: 100%; height: 2.25rem; margin: 0;
+  background: transparent; cursor: grab;
+}
+input[type="range"]:active { cursor: grabbing; }
+input[type="range"]::-webkit-slider-runnable-track { height: 6px; background: var(--rule-hi); border-radius: 3px; }
+input[type="range"]::-moz-range-track { height: 6px; background: var(--rule-hi); border-radius: 3px; }
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 22px; height: 22px; margin-top: -8px; border-radius: 50%;
+  background: var(--phos); border: 3px solid var(--ground); box-shadow: 0 0 0 1px var(--phos), var(--glow-phos);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--phos); border: 3px solid var(--ground); box-shadow: 0 0 0 1px var(--phos), var(--glow-phos);
+}
+input[type="range"]:focus-visible { outline: none; }
+input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px var(--phos), var(--glow-phos); }
 
 .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 .chart { margin: 0; min-width: 0; background: var(--panel); border: 1px solid var(--rule); padding: .9rem; display: grid; gap: .6rem; }
@@ -419,17 +444,23 @@ input[type="range"] { width: 100%; accent-color: var(--phos); height: 2.25rem; m
 body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 41; background: var(--phos); }
 .tmux {
   position: sticky; top: env(safe-area-inset-top, 0px); z-index: 40;
-  display: flex; align-items: center; gap: 1rem; min-height: var(--bar-h);
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-height: var(--bar-h);
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
   background: var(--phos); color: var(--ground);
   font: 500 var(--fs-1)/1 var(--mono);
 }
 .tmux-session { font: 400 1.6rem/1 var(--crt); }
-.tmux-windows { list-style: none; margin: 0; padding: 0; display: flex; gap: .2rem; overflow-x: auto; scrollbar-width: none; flex: 1; }
-.tmux-windows a { color: var(--ground); text-decoration: none; padding: .95rem .8rem; display: block; white-space: nowrap; }
-.tmux-windows a:hover { background: rgba(5, 10, 7, .12); }
-.tmux-windows a[aria-current="true"] { background: var(--ground); color: var(--phos); }
+.tmux-windows { list-style: none; margin: 0; padding: 0; display: flex; gap: .5rem; }
+/* the two section links are real buttons: dark on the green bar, inverting on hover */
+.tmux-windows a {
+  display: block; white-space: nowrap; text-decoration: none; cursor: pointer;
+  color: var(--phos); background: var(--ground); border: 1px solid var(--ground);
+  padding: .55rem .9rem; font-weight: 600; transition: background-color .15s, color .15s;
+}
+.tmux-windows a:hover { background: transparent; color: var(--ground); }
+.tmux-windows a:active { transform: translateY(1px); }
+.tmux-windows a[aria-current="true"] { box-shadow: 0 0 0 2px var(--ground), 0 0 0 4px rgba(5, 10, 7, .25); }
 .tmux-windows a:focus-visible { outline: 2px solid var(--ground); outline-offset: -2px; }
 
 /* ------------------------------------------------------------------ narrow */
@@ -445,14 +476,13 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
   .seg { display: grid; grid-template-columns: 1fr; width: 100%; }
   .seg button { justify-content: center; padding: .9rem 1rem; }
   .screen { gap: 4.5rem; padding-top: 2rem; }
-  .ask { flex-wrap: wrap; }
-  .ask .ps1 { display: none; }
-  .ask input { flex-basis: 100%; }
-  .go { width: 100%; }
+  .field .ps1 { display: none; }
+  .field .go { padding: .75rem .9rem; }
   .replay-ctl { grid-template-columns: 1fr; }
-  .tmux-session { display: none; }
-  .tmux { font-size: var(--fs-0); }
-  .tmux-windows a { padding: .95rem .55rem; }
+  .tmux { font-size: var(--fs-0); gap: .5rem; }
+  .tmux-session { font-size: 1.3rem; }
+  .tmux-windows { gap: .35rem; }
+  .tmux-windows a { padding: .5rem .55rem; }
   .bar { grid-template-columns: 7ch minmax(0, 1fr) 5.5ch; }
   .files { grid-template-columns: 1fr; }
   .syms { grid-template-columns: 1fr; }
@@ -461,10 +491,8 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 }
 @media (prefers-reduced-motion: reduce) {
   .boot-log span { animation: none; opacity: 1; }
-  .cursor { animation: none; }
-  .loadbar span { transition: none; }
+  .cursor, .title-cursor { animation: none; }
   .math-body { animation: none; }
-  .step.fresh { animation: none; }
   .seg-thumb { transition: none; }
   .console-inner, .console-body::after, .pick-label.swap, .steps.switching, .seg-thumb.flash { animation: none !important; }
   .console-body::after { display: none; }
