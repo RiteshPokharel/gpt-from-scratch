@@ -52,7 +52,6 @@ Promise.all([
   charts(models);
   replayer(replay);
   compare(models, merges);
-  statusBar(models);
   navHighlight();
   scrollTo(0, 0);
 }).catch((err) => {
@@ -530,9 +529,6 @@ function compare(m, merges) {
   $("#cmp").innerHTML = r1 + r2 + r3 + r4 + r5;
 }
 
-function statusBar(m) {
-  $("#updated").textContent = `Numbers last updated ${m.updated}.`;
-}
 
 // The coloured thumb behind a model switch: slides to the chosen button and takes its colour.
 function moveThumb(seg, flash = true) {
