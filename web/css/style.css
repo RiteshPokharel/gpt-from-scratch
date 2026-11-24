@@ -38,6 +38,7 @@
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; scroll-behavior: smooth; scroll-padding-top: calc(var(--bar-h) + 1.5rem + env(safe-area-inset-top, 0px)); }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 
+html, body { overflow-x: clip; }  /* the page only ever scrolls vertically */
 body {
   margin: 0;
   background: var(--ground);
@@ -145,10 +146,10 @@ body[data-active="shakespeare"] #try, #how[data-active="shakespeare"] { --accent
 /* model switch: a coloured thumb slides behind the chosen button */
 .seg { display: inline-flex; gap: .4rem; position: relative; isolation: isolate; }
 .seg-thumb {
-  position: absolute; z-index: -1; top: 0; left: 0; height: 100%; width: 0;
+  position: absolute; z-index: -1; top: 0; left: 0; height: 0; width: 0;
   background: var(--m, var(--phos)); opacity: 0;
   box-shadow: 0 0 6px rgba(var(--m-rgb, 57, 255, 122), .45), 0 0 18px rgba(var(--m-rgb, 57, 255, 122), .15);
-  transition: transform .32s cubic-bezier(.2, .9, .25, 1), width .32s cubic-bezier(.2, .9, .25, 1),
+  transition: transform .32s cubic-bezier(.2, .9, .25, 1), width .32s cubic-bezier(.2, .9, .25, 1), height .32s cubic-bezier(.2, .9, .25, 1),
               background-color .32s ease, box-shadow .32s ease, opacity .2s ease;
 }
 .seg-thumb.on { opacity: 1; }
@@ -439,6 +440,10 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
   .syms { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 560px) {
+  /* phones: the model buttons stack full width, and the highlight slides up and down */
+  .seg-row { display: grid; width: 100%; }
+  .seg { display: grid; grid-template-columns: 1fr; width: 100%; }
+  .seg button { justify-content: center; padding: .9rem 1rem; }
   .screen { gap: 4.5rem; padding-top: 2rem; }
   .ask { flex-wrap: wrap; }
   .ask .ps1 { display: none; }

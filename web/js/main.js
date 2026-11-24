@@ -431,8 +431,10 @@ function moveThumb(seg, flash = true) {
   const first = !thumb.classList.contains("on");
   if (first) thumb.style.transition = "none"; // appear in place, then slide from there on
   thumb.dataset.model = on.dataset.model;
+  // follows the button in both directions: side by side on wide screens, stacked on phones
   thumb.style.width = `${on.offsetWidth}px`;
-  thumb.style.transform = `translateX(${on.offsetLeft}px)`;
+  thumb.style.height = `${on.offsetHeight}px`;
+  thumb.style.transform = `translate(${on.offsetLeft}px, ${on.offsetTop}px)`;
   thumb.classList.add("on");
   if (first) { void thumb.offsetWidth; thumb.style.transition = ""; }
   if (flash && !first) { thumb.classList.remove("flash"); void thumb.offsetWidth; thumb.classList.add("flash"); } // lights up as it lands
