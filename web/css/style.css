@@ -441,8 +441,10 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px 
 .intro a, .refs a { color: var(--phos); text-decoration: underline; text-decoration-color: rgba(57, 255, 122, .4); text-underline-offset: 3px; }
 .intro a:hover, .refs a:hover { text-decoration-color: var(--phos); color: var(--bright); }
 .refs { display: grid; gap: .6rem; }  /* full width: each reference fits on one line on a laptop */
-.credit { margin: 0; padding-top: 1.25rem; border-top: 1px solid var(--rule); color: var(--ink); font-size: var(--fs-text); }
+.credit { margin: 0; padding-top: 1.25rem; border-top: 1px solid var(--rule); color: var(--ink); font-size: var(--fs-text); max-width: none !important; }  /* one line on a laptop */
 .sig { font: 400 1.65em/1 var(--crt); color: var(--phos); text-shadow: var(--glow-phos); letter-spacing: .02em; vertical-align: -.08em; text-decoration: none; border-bottom: 1px dashed rgba(57, 255, 122, .5); }
+.code-link { color: var(--dim); font-size: var(--fs-0); text-decoration: none; white-space: nowrap; }  /* quiet: the last thing on the page */
+.code-link:hover { color: var(--phos); text-decoration: underline; text-underline-offset: 3px; }
 .sig:hover { color: var(--bright); border-bottom-style: solid; border-bottom-color: var(--phos); }
 .refs h2 { margin: 0; font: 600 var(--fs-0)/1.4 var(--mono); color: var(--dim); }
 .refs ol { margin: 0; padding-left: 1.4rem; display: grid; gap: .4rem; font-size: var(--fs-0); line-height: 1.6; }
