@@ -56,8 +56,8 @@ self.onmessage = async ({ data }) => {
       self.postMessage({ type: "analysis", analysis: plain, id });
       let batch = [];
       let last = performance.now();
-      runner.generate(analysis, data.n, (piece) => {
-        batch.push(piece);
+      runner.generate(analysis, data.n, (piece, tokenId, alts) => {
+        batch.push({ p: piece, a: alts });
         const now = performance.now();
         if (now - last > 30) { self.postMessage({ type: "pieces", pieces: batch, id }); batch = []; last = now; }
       });

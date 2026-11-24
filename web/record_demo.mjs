@@ -63,11 +63,11 @@ for (const name of ["shakespeare", "tinystories"]) {
     let plain;
     for (let v = 0; v < VARIANTS; v++) {
       const analysis = runner.analyse(prompt); // resets the model, so every story starts fresh
-      const pieces = [];
-      runner.generate(analysis, LENGTH[name], (p) => pieces.push(p), mulberry32(1000 + i * 10 + v));
+      const pieces = [], alts = [];
+      runner.generate(analysis, LENGTH[name], (p, id, a) => { pieces.push(p); alts.push(a); }, mulberry32(1000 + i * 10 + v));
       const { logits, ...rest } = analysis;
       plain = rest;
-      variants.push(pieces);
+      variants.push({ pieces, alts });
     }
     runs[prompt] = { analysis: plain, variants };
   });

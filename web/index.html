@@ -6,6 +6,16 @@
 <title>gpt-from-scratch</title>
 <meta name="description" content="Two small GPT language models written from scratch in PyTorch and trained on a laptop. Try them, and see what happens inside when they write.">
 <meta name="theme-color" content="#050a07">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%23050a07'/%3E%3Ctext x='3' y='22' font-family='monospace' font-size='17' font-weight='700' fill='%2339ff7a'%3E%3E_%3C/text%3E%3C/svg%3E">
+<!-- link previews (LinkedIn, WhatsApp, X). The image URL assumes the GitHub Pages address. -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="gpt-from-scratch">
+<meta property="og:description" content="Two GPT language models built from scratch and trained on a laptop. Try them in your browser, and see how they pick each word.">
+<meta property="og:url" content="https://riteshpokharel.github.io/gpt-from-scratch/">
+<meta property="og:image" content="https://riteshpokharel.github.io/gpt-from-scratch/share.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&family=STIX+Two+Text:ital@0;1&family=VT323&display=swap">
@@ -59,6 +69,7 @@
       <pre class="out" id="out" aria-live="off"></pre>
       <div class="console-foot">
         <span id="count"></span>
+        <span class="hint">Hover or tap any word to see what else the model considered</span>
       </div>
       <div class="loadbar" id="loadbar" hidden><span id="loadfill"></span></div>
     </div>
@@ -78,6 +89,7 @@
   <section id="how" class="block" aria-labelledby="how-h" data-active="tinystories">
     <div class="sec-head">
       <h2 id="how-h">What happens when you press Generate</h2>
+      <p class="intro" id="how-intro">The model writes one small piece at a time. Here is how it picks the next one, step by step, for a fixed example.</p>
       <div class="seg-row">
         <span class="flag" id="how-seg-label">Show the example for:</span>
         <div class="seg" id="how-seg" role="radiogroup" aria-labelledby="how-seg-label">
@@ -85,12 +97,11 @@
           <button type="button" role="radio" data-model="shakespeare" aria-checked="false"><span class="swatch"></span>Shakespeare</button>
         </div>
       </div>
-      <p class="intro" id="how-intro">The model writes one small piece at a time. Here is how it picked the first piece after your starting line.</p>
     </div>
     <ol class="steps">
       <li class="step">
         <div class="step-text">
-          <h3>Your text is cut into tokens</h3>
+          <h3>The text is cut into tokens</h3>
           <p id="s1-text">The model can't read letters directly. It cuts the text into pieces called tokens, and each token has an ID number.</p>
         </div>
         <div class="step-vis tokens" id="s1"></div>
@@ -141,7 +152,7 @@
           <summary>
             <span class="m-sign" aria-hidden="true"></span>
             <span class="m-title"><span class="m-open">Show the math</span><span class="m-close">Hide the math</span></span>
-            <span class="m-sub">softmax, with this run's real numbers</span>
+            <span class="m-sub">softmax, with this example's real numbers</span>
           </summary>
           <div class="math-body">
             <p class="math-src">Softmax: from raw scores to chances</p>
@@ -181,7 +192,7 @@
         <div class="readout"><span class="big" id="replay-step">0</span><span class="unit">step</span><span class="big" id="replay-val">0.00</span><span class="unit">loss</span></div>
       </div>
       <pre class="out replay-out" id="replay-out"></pre>
-      <p class="note">Drag the slider: the story it wrote every 500 steps while training, starting from random noise.</p>
+      <p class="note">The story it wrote every 500 steps while training. Drag back to step 0 to see where it started: random noise.</p>
     </div>
     <div class="charts">
       <figure class="chart" data-model="shakespeare" id="chart-char">

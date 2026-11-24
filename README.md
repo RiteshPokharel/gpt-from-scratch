@@ -1,21 +1,37 @@
 # GPT from scratch
 
-A small GPT-style language model, written and trained from the ground up in PyTorch, on a laptop (Apple M5, using the MPS GPU backend).
+Two GPT-style language models written and trained from the ground up in PyTorch, on a laptop (Apple M5, MPS GPU backend), plus an interactive page where they run in the browser.
 
-The first version is a character-level model trained on the works of Shakespeare. A larger model with a byte-pair encoding tokenizer, trained on the TinyStories dataset, is next.
+| Model | Reads text as | Parameters | Trained on | Training time | Validation loss |
+|---|---|---|---|---|---|
+| Bigram (baseline) | characters | 4,225 | TinyShakespeare | 6 s | 2.49 per char |
+| **Shakespeare GPT** | characters (65) | 10.8M | TinyShakespeare, 1.1M chars | 27 min | **1.48** per char |
+| **TinyStories GPT** | BPE tokens (4,097) | 27.4M | TinyStories, 2.7M stories | training | training |
 
-## Results
+Both models follow the decoder-only transformer from [Attention Is All You Need](https://arxiv.org/abs/1706.03762): token + position embeddings, a stack of pre-LayerNorm blocks (multi-head causal self-attention, then an MLP, each with a residual connection), and a final linear layer and softmax over the vocabulary. Everything is written by hand: the attention, the blocks, the training loop and the byte-pair encoding tokenizer. No pretrained weights, no tokenizer libraries.
 
-| Model | Parameters | Training time | Validation loss |
-|---|---|---|---|
-| Bigram (baseline) | 4,225 | 6 s | 2.49 |
-| GPT | 10.8M | 27 min | **1.48** |
+## The interactive page
+
+`web/` is a static page (plain HTML, CSS and JavaScript, no dependencies) with:
+
+- **A demo.** Pick a model and a starting line and watch it write. Recorded examples play instantly; a custom prompt loads the model (int8 weights, 11 MB / 28 MB) into the browser and runs it there.
+- **Every word explained.** Hover or tap any generated word to see the model's other top guesses at that point.
+- **What happens when you press Generate.** Tokens, embeddings, attention, the next-token probabilities and sampling, on a fixed example per model, with the attention and softmax equations worked through on real numbers.
+- **The two models side by side**, and how they learned: loss curves and the stories the TinyStories model wrote every 500 steps of training.
+
+The browser engine (`web/js/gpt.js`) is a from-scratch JavaScript forward pass with a key/value cache. It is checked against PyTorch with `node web/js/test_engine.mjs`: the same top prediction on every test prompt, probabilities within 0.7 percentage points.
+
+Run it locally:
+
+```bash
+python3 -m http.server -d web 8000     # then open http://localhost:8000
+```
+
+## Shakespeare model
 
 ![Training and validation loss](out/loss.png)
 
-Validation loss stopped improving around step 2,000 while training loss kept falling, so the model was starting to overfit. The checkpoint with the best validation loss is the one kept.
-
-### Sample
+Validation loss stopped improving around step 2,000 while training loss kept falling: the model had read its 1M characters about 33 times and was starting to memorise them. The checkpoint with the best validation loss is the one kept.
 
 Generated from the prompt `ROMEO:` at temperature 0.8:
 
@@ -33,7 +49,7 @@ ROMEO:
 Now Capulet! how now, by this speed, the earth doth more flatter
 ```
 
-## What the attention heads learned
+### What the attention heads learned
 
 Feeding the line below through the trained model and recording every head's attention weights (`visualize_attention.py`):
 
@@ -63,24 +79,30 @@ None of these were programmed in. They come out of training to predict the next 
 Early layers look locally, middle layers latch onto word and line boundaries, and later layers spread their attention over longer distances.
 </details>
 
-## How it works
+## TinyStories model
 
-1. **Tokenizer.** Each of the 65 distinct characters in the text gets an integer ID.
-2. **Embeddings.** Each token is turned into a 384-number vector, plus a vector for its position (up to 256 characters of context).
-3. **Transformer blocks (×6).** Each block has multi-head causal self-attention (6 heads), where every character looks back at earlier characters and gathers what it needs, followed by an MLP. Residual connections and LayerNorm keep the stack trainable.
-4. **Output.** A linear layer gives a score for each of the 65 characters; softmax turns them into probabilities for the next one.
+**Tokenizer.** A byte-level BPE tokenizer (`bpe.py`), trained on the first 20 MB of the stories: it starts from the 256 byte values and repeatedly merges the most frequent adjacent pair, 3,840 times, with GPT-2-style pre-splitting so merges never cross word boundaries. That gives 4,096 tokens plus an end-of-story token, at about 3.9 characters per token. `python test_bpe.py` runs its 25 tests.
 
-Training: AdamW, learning rate warmed up over 100 steps then decayed from 1e-3 to 1e-4 along a cosine curve, batch size 64, dropout 0.2, gradient clipping at 1.0.
+**Model.** 8 layers, 8 heads, 512-dimensional embeddings, 256-token context (about 1,000 characters), weight tying between the token embedding and the output layer, PyTorch's fused attention.
+
+**Training.** 30,000 steps of 64 × 256 tokens (about 490M tokens, under one pass over the 557M-token training set), AdamW with 500 warmup steps and cosine decay from 6e-4 to 6e-5, gradient clipping at 1.0, bf16 mixed precision. A checkpoint and a sample story are written every 500 steps.
+
+Results are added when the training run finishes.
 
 ## Files
 
 | File | What it is |
 |---|---|
 | `bigram.py` | Baseline model: predicts the next character from the current one only |
-| `gpt.py` | The full GPT and its training loop |
-| `sample.py` | Generate text from a trained checkpoint |
-| `plot_loss.py` | Plot the training curve |
+| `gpt.py` | Character-level GPT and its training loop (Shakespeare) |
+| `sample.py` | Generate text from the Shakespeare checkpoint |
+| `plot_loss.py` | Plot the Shakespeare training curve |
 | `visualize_attention.py` | Draw what each attention head looks at |
+| `bpe.py`, `test_bpe.py` | Byte-level BPE tokenizer and its tests |
+| `model.py` | Configurable GPT used for TinyStories |
+| `prepare_tinystories.py` | Train the tokenizer and encode the dataset to token files |
+| `train_tinystories.py` | Training loop with warmup, cosine decay, bf16, checkpoints and `--resume` |
+| `web/` | The interactive page, the JavaScript engine and the scripts that export data for it |
 
 ## Run it
 
@@ -89,11 +111,17 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 
+# Shakespeare
 python bigram.py                         # baseline, a few seconds
 python gpt.py                            # train the GPT (~30 min on an M5)
 python sample.py --prompt "JULIET:" --temp 0.8
+
+# TinyStories (download TinyStoriesV2-GPT4-train.txt and -valid.txt into data/tinystories/ first)
+python prepare_tinystories.py            # tokenizer + token files, ~2 min
+python train_tinystories.py              # ~7 h on an M5; Ctrl+C is safe, then --resume
 ```
 
-## Dataset
+## Data
 
-[TinyShakespeare](https://github.com/karpathy/char-rnn/tree/master/data/tinyshakespeare), about 1.1 million characters, in `data/shakespeare.txt`.
+- [TinyShakespeare](https://github.com/karpathy/char-rnn/tree/master/data/tinyshakespeare), about 1.1 million characters, in `data/shakespeare.txt`.
+- [TinyStories](https://arxiv.org/abs/2305.07759) (Eldan and Li, 2023), version 2: 2.7 million short stories in simple English, about 2.2 GB of text.

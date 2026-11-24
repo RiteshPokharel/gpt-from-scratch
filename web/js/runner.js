@@ -73,22 +73,26 @@ export function makeRunner(manifest, buffer, merges) {
     };
   }
 
-  // Continue after analyse(); calls onPiece(text | null for end-of-story) for each token.
+  // Continue after analyse(); calls onPiece(text | null for end-of-story, id, alternatives) for each token.
   function generate(analysis, n, onPiece, rand = Math.random) {
     const history = analysis.ids.slice();
     let logits = analysis.logits;
     let pending = [];
     for (let i = 0; i < n; i++) {
       const id = sample(logits, settings.temperature, settings.topK, rand);
+      // what else it considered here: the model's top 3 (plain probabilities), plus the pick
+      const probs = softmax(logits);
+      const alts = topK(probs, 3).map((t) => [label(t.id), Math.round(t.p * 1000)]);
+      if (!topK(probs, 3).some((t) => t.id === id)) alts.push([label(id), Math.round(probs[id] * 1000)]);
       history.push(id);
-      if (id === eot) { onPiece(null, id); pending = []; }
-      else if (isChar) onPiece(chars[id], id);
+      if (id === eot) { onPiece(null, id, alts); pending = []; }
+      else if (isChar) onPiece(chars[id], id, alts);
       else {
         pending.push(...bpe.bytes(id));
         try {
           const s = new TextDecoder("utf-8", { fatal: true }).decode(Uint8Array.from(pending));
           pending = [];
-          onPiece(s, id);
+          onPiece(s, id, alts);
         } catch { /* part of a multi-byte character: wait for the rest */ }
       }
       if (model.T >= model.B) {
