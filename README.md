@@ -15,7 +15,6 @@ Both models follow the decoder-only transformer from [Attention Is All You Need]
 `web/` is a static page (plain HTML, CSS and JavaScript, no dependencies) with:
 
 - **A demo.** Pick a model and a starting line and watch it write. Recorded examples play instantly; a custom prompt loads the model (int8 weights, 11 MB / 28 MB) into the browser and runs it there.
-- **Every word explained.** Hover or tap any generated word to see the model's other top guesses at that point.
 - **What happens when you press Generate.** Tokens, embeddings, attention, the next-token probabilities and sampling, on a fixed example per model, with the attention and softmax equations worked through on real numbers.
 - **The two models side by side**, and how they learned: loss curves and the stories the TinyStories model wrote every 500 steps of training.
 

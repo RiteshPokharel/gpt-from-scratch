@@ -124,14 +124,10 @@ function demo(recordings, manifests) {
     const cursor = document.createElement("span");
     cursor.className = "cursor"; cursor.setAttribute("aria-hidden", "true");
     out.append(p, cursor);
-    hideTip();
-    state.view = { cursor, tokens: 0, chars: 0, alts: [] };
-    return state.view;
+    return { cursor, tokens: 0, chars: 0 };
   }
-  function addPiece(view, piece, alts) {
+  function addPiece(view, piece) {
     const s = document.createElement("span");
-    s.dataset.k = view.alts.length;
-    view.alts.push(alts);
     if (piece === null) { s.className = "t eot"; s.textContent = "end of story"; }
     else { s.className = "t"; s.textContent = piece; view.chars += Array.from(piece).length; }
     view.cursor.before(s);
@@ -142,40 +138,6 @@ function demo(recordings, manifests) {
     view.cursor.remove();
     labels();
   }
-
-  // ---------------------------------------------------------------- "what else it considered" popup
-  const tip = document.createElement("div");
-  tip.className = "alt-tip"; tip.hidden = true; tip.setAttribute("role", "tooltip");
-  $(".console").append(tip);
-  let tipFor = null;
-  function showTip(span) {
-    const alts = state.view?.alts[+span.dataset.k];
-    if (!alts) return;
-    const picked = span.classList.contains("eot") ? "<end of story>" : span.textContent;
-    const max = Math.max(...alts.map((a) => a[1]), 1);
-    tip.innerHTML = `<p class="alt-h">the model's top guesses here</p>${alts.map(([t, p]) => `
-      <div class="alt-row${t === picked ? " picked" : ""}"><span class="alt-t">${esc(vis(t))}</span><span class="alt-bar"><i style="width:${(p / max) * 100}%"></i></span><span class="alt-p">${p >= 10 ? Math.round(p / 10) : (p / 10).toFixed(1)}%</span></div>`).join("")}`;
-    tip.hidden = false;
-    const box = $(".console").getBoundingClientRect(), r = span.getBoundingClientRect();
-    const left = Math.min(Math.max(8, r.left - box.left), box.width - tip.offsetWidth - 8);
-    tip.style.left = `${left}px`;
-    tip.style.top = `${r.bottom - box.top + 6}px`;
-    out.querySelectorAll(".t.on").forEach((x) => x.classList.remove("on"));
-    span.classList.add("on");
-    tipFor = span;
-  }
-  function hideTip() {
-    tip.hidden = true; tipFor = null;
-    out.querySelectorAll(".t.on").forEach((x) => x.classList.remove("on"));
-  }
-  out.addEventListener("pointerover", (e) => { if (e.pointerType === "mouse" && e.target.classList?.contains("t")) showTip(e.target); });
-  out.addEventListener("pointerleave", (e) => { if (e.pointerType === "mouse") hideTip(); });
-  out.addEventListener("click", (e) => {
-    const t = e.target.closest?.(".t");
-    if (!t) return hideTip();
-    if (tipFor === t) hideTip(); else showTip(t);
-  });
-  document.addEventListener("click", (e) => { if (!tip.hidden && !e.target.closest(".out")) hideTip(); });
 
   // ---------------------------------------------------------------- run
   // Every run gets an id; starting a new run (or switching model) makes the old one stop.
@@ -195,14 +157,13 @@ function demo(recordings, manifests) {
     if (rec) {
       const key = state.last;
       state.variant[key] = key in state.variant ? (state.variant[key] + 1) % rec.variants.length : 0;
-      const variant = rec.variants[state.variant[key]];
-      const pieces = variant.pieces, alts = variant.alts;
-      if (reduceMotion) { pieces.forEach((p, k) => addPiece(view, p, alts[k])); finish(view); return; }
+      const pieces = rec.variants[state.variant[key]];
+      if (reduceMotion) { pieces.forEach((p) => addPiece(view, p)); finish(view); return; }
       let i = 0;
       const per = state.model === "shakespeare" ? 2 : 1; // roughly the live speed of each model
       state.timer = setInterval(() => {
         if (id !== state.runId) { clearInterval(state.timer); return; }
-        for (let k = 0; k < per && i < pieces.length; k++, i++) addPiece(view, pieces[i], alts[i]);
+        for (let k = 0; k < per && i < pieces.length; k++) addPiece(view, pieces[i++]);
         if (i >= pieces.length) { clearInterval(state.timer); finish(view); }
       }, 28);
       return;
@@ -215,7 +176,7 @@ function demo(recordings, manifests) {
       if (data.type === "analysis") analysis = data.analysis;
       else if (data.type === "pieces") {
         if (first) { first = false; t0 = performance.now(); }
-        data.pieces.forEach((x) => addPiece(view, x.p, x.a));
+        data.pieces.forEach((p) => addPiece(view, p));
       } else if (data.type === "done") {
         const secs = (performance.now() - t0) / 1000;
         if (secs > 0.2) state.speed[model] = Math.round(view.tokens / secs); // measured on this visitor's machine

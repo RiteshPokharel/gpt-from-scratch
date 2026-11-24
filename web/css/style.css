@@ -134,7 +134,7 @@ body[data-active="shakespeare"] #try, #how[data-active="shakespeare"] { --accent
   background: var(--m); border-color: var(--m); color: var(--ground);
   box-shadow: 0 0 6px rgba(var(--m-rgb), .45), 0 0 18px rgba(var(--m-rgb), .15);
 }
-.seg button[aria-checked="true"] .swatch { background: var(--ground); box-shadow: none; }
+.seg button[aria-checked="true"] .swatch { display: none; }  /* the filled button already shows the model */
 .seg-row { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .9rem; margin-top: .3rem; }
 .seg-row .flag { font-size: var(--fs-0); }
 .mode { margin: 0; font-size: var(--fs-0); color: var(--dim); max-width: 46ch; }
@@ -175,23 +175,6 @@ body[data-active="shakespeare"] #try, #how[data-active="shakespeare"] { --accent
 .cursor { display: inline-block; width: .6em; height: 1.1em; vertical-align: text-bottom; margin-left: 1px; background: var(--accent); box-shadow: var(--glow-accent); animation: blink 1s steps(1) infinite; }
 @keyframes blink { 50% { opacity: 0; } }
 .console-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .5rem 1rem; align-items: center; padding-block: .6rem; border-top: 1px solid var(--rule); font-size: var(--fs-0); color: var(--dim); font-variant-numeric: tabular-nums; }
-.console { position: relative; }
-.out .t { cursor: pointer; transition: background-color .1s; }
-.out .t:hover, .out .t.on { background: rgba(var(--accent-rgb), .22); }
-.hint { color: var(--dim); }
-.alt-tip {
-  position: absolute; z-index: 20; width: 15rem; padding: .65rem .75rem !important;
-  background: var(--ground); border: 1px solid var(--accent); box-shadow: 0 8px 24px rgba(0, 0, 0, .6);
-  display: grid; gap: .3rem; font-size: var(--fs-0);
-}
-.alt-h { margin: 0 0 .15rem; color: var(--dim); font-size: 11px; }
-.alt-row { display: grid; grid-template-columns: 6.5ch minmax(0, 1fr) 4.5ch; gap: .55rem; align-items: center; font-variant-numeric: tabular-nums; }
-.alt-t { color: var(--bright); white-space: pre; overflow: hidden; text-overflow: ellipsis; }
-.alt-bar { height: .7rem; border-left: 1px solid var(--rule-hi); }
-.alt-bar i { display: block; height: 100%; background: var(--rule-hi); }
-.alt-p { color: var(--dim); text-align: right; }
-.alt-row.picked .alt-t, .alt-row.picked .alt-p { color: var(--accent); }
-.alt-row.picked .alt-bar i { background: var(--accent); box-shadow: var(--glow-accent); }
 .loadbar { height: 3px; padding: 0 !important; background: var(--rule); }
 .loadbar span { display: block; height: 100%; width: 0; background: var(--accent); box-shadow: var(--glow-accent); transition: width .2s; }
 
