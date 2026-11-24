@@ -81,6 +81,8 @@ class CausalSelfAttention(nn.Module):
         self.resid_dropout = nn.Dropout(dropout)
         # Causal mask: position t may only attend to positions <= t.
         self.register_buffer("tril", torch.tril(torch.ones(block_size, block_size)))
+        self.save_weights = False  # keep attention weights for visualize_attention.py
+        self.last_weights = None
 
     def forward(self, x):
         B, T, C = x.shape  # batch, time (characters), channels (n_embd)
@@ -94,6 +96,8 @@ class CausalSelfAttention(nn.Module):
         scores = q @ k.transpose(-2, -1) / math.sqrt(self.head_size)  # (B, nh, T, T)
         scores = scores.masked_fill(self.tril[:T, :T] == 0, float("-inf"))
         weights = F.softmax(scores, dim=-1)
+        if self.save_weights:
+            self.last_weights = weights.detach().cpu()
         weights = self.attn_dropout(weights)
 
         out = weights @ v                                    # (B, nh, T, head_size)

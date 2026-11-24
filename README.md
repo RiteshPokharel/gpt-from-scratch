@@ -33,6 +33,36 @@ ROMEO:
 Now Capulet! how now, by this speed, the earth doth more flatter
 ```
 
+## What the attention heads learned
+
+Feeding the line below through the trained model and recording every head's attention weights (`visualize_attention.py`):
+
+```
+ROMEO:
+Is the day so young?
+
+BENVOLIO:
+But new struck nine.
+```
+
+In each heatmap, a row is the character doing the looking, a column is the character being looked at, and brighter means more attention. The upper triangle is empty because of the causal mask.
+
+![Three attention heads up close](out/attention_heads.png)
+
+- **Layer 1, head 2: the previous characters.** The bright line just under the diagonal means each character looks at the one or two before it. All six heads in layer 1 do some version of this, which is how the model handles spelling.
+- **Layer 2, head 6: spaces and line breaks.** The vertical stripes sit on the spaces and newlines, so this head tracks where the current word started.
+- **Layer 6, head 6: inside a speaker's name.** While the model is writing `BENVOLIO:`, every character in the name puts 97–100% of its attention on the blank line just before it. That tells the model it is in the middle of a speaker's name, so it keeps writing capitals until the colon and then starts a new line.
+
+None of these were programmed in. They come out of training to predict the next character.
+
+<details>
+<summary>All 36 heads (6 layers × 6 heads)</summary>
+
+![Attention in every layer and head](out/attention_grid.png)
+
+Early layers look locally, middle layers latch onto word and line boundaries, and later layers spread their attention over longer distances.
+</details>
+
 ## How it works
 
 1. **Tokenizer.** Each of the 65 distinct characters in the text gets an integer ID.
@@ -50,6 +80,7 @@ Training: AdamW, learning rate warmed up over 100 steps then decayed from 1e-3 t
 | `gpt.py` | The full GPT and its training loop |
 | `sample.py` | Generate text from a trained checkpoint |
 | `plot_loss.py` | Plot the training curve |
+| `visualize_attention.py` | Draw what each attention head looks at |
 
 ## Run it
 
